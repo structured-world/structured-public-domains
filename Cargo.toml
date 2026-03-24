@@ -1,0 +1,26 @@
+[package]
+name = "structured-public-domains"
+version = "0.0.1"
+edition = "2024"
+rust-version = "1.85"
+authors = ["Structured World Foundation <foundation@sw.foundation>"]
+description = "Compact Public Suffix List (PSL) for Rust. 32KB embedded JSON trie, O(depth) lookup. Auto-updated monthly from publicsuffix.org."
+documentation = "https://docs.rs/structured-public-domains/"
+repository = "https://github.com/structured-world/structured-public-domains"
+license = "MIT"
+readme = "README.md"
+keywords = ["psl", "public-suffix", "domain", "tld", "validation"]
+categories = ["web-programming", "parser-implementations"]
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+zstd = "0.13"
+
+[dev-dependencies]
+# None yet
+
+[lints.clippy]
+unwrap_used = "deny"
+expect_used = "deny"
+panic = "deny"

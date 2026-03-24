@@ -1,0 +1,26 @@
+//! # structured-public-domains
+//!
+//! Compact Public Suffix List (PSL) for Rust.
+//!
+//! - **32KB** embedded data (JSON trie compressed with zstd)
+//! - **O(depth)** trie walk lookup (typically 2-3 steps)
+//! - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
+//! - ICANN vs Private domain distinction
+//! - Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
+//!
+//! # Example
+//!
+//! ```
+//! use structured_public_domains::lookup;
+//!
+//! let info = lookup("www.example.co.uk").unwrap();
+//! assert_eq!(info.suffix(), "co.uk");
+//! assert_eq!(info.registrable_domain(), Some("example.co.uk"));
+//! assert!(info.is_known());
+//! ```
+
+#![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+mod trie;
+
+pub use trie::{DomainInfo, is_known_suffix, lookup, registrable_domain};
