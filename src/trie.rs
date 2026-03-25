@@ -67,7 +67,8 @@ impl DomainInfo {
 
 /// Look up a domain in the Public Suffix List.
 ///
-/// Returns `None` if the input is empty or has no valid suffix.
+/// Returns `None` if the input is empty or contains invalid labels (empty/consecutive dots).
+/// Always returns `Some` for valid domain strings (unknown TLDs fall back to the implicit `*` rule).
 ///
 /// # Example
 ///
@@ -141,13 +142,13 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
     let suffix_labels: Vec<String> = labels[..suffix_depth]
         .iter()
         .rev()
-        .map(|l| l.to_ascii_lowercase())
+        .map(|l| l.to_lowercase())
         .collect();
     let suffix = suffix_labels.join(".");
 
     let registrable = if labels.len() > suffix_depth {
         // eTLD+1: registrable label + suffix (all lowercased)
-        let reg_label = labels[suffix_depth].to_ascii_lowercase();
+        let reg_label = labels[suffix_depth].to_lowercase();
         Some(format!("{reg_label}.{suffix}"))
     } else {
         None

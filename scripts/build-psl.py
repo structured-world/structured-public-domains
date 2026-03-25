@@ -34,7 +34,7 @@ def build_trie(psl_path: Path) -> dict:
             labels.reverse()
 
             node = trie
-            for i, label in enumerate(labels):
+            for label in labels:
                 label_lower = label.lower()
                 if label_lower not in node["c"]:
                     node["c"][label_lower] = {"c": {}}
