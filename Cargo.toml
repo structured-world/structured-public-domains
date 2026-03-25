@@ -17,6 +17,13 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 zstd = "0.13"
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "lookup"
+harness = false
+
 [lints.clippy]
 unwrap_used = "deny"
 expect_used = "deny"
