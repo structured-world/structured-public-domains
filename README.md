@@ -5,7 +5,7 @@ Compact Public Suffix List (PSL) for Rust.
 [![CI](https://github.com/structured-world/structured-public-domains/actions/workflows/ci.yml/badge.svg)](https://github.com/structured-world/structured-public-domains/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/structured-public-domains.svg)](https://crates.io/crates/structured-public-domains)
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 - **35KB** embedded data (JSON trie compressed with zstd) — 25x smaller than `psl` crate
 - **O(depth)** trie walk lookup (typically 2-3 steps)
@@ -51,4 +51,4 @@ USDT (TRC-20): `TFDsezHa1cBkoeZT5q2T49Wp66K8t2DmdA`
 
 ## License
 
-MIT
+Apache License 2.0
