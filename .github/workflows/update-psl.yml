@@ -1,0 +1,57 @@
+name: Update PSL Data
+
+on:
+  schedule:
+    - cron: '0 6 1 * *'  # 1st of each month, 06:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate token (SW Release Bot)
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.RELEASER_APP_ID }}
+          private-key: ${{ secrets.RELEASER_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v6
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Download fresh PSL
+        run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o data/public_suffix_list.dat
+
+      - name: Build trie + compress
+        run: python3 scripts/build-psl.py
+
+      - name: Run tests
+        run: cargo test --all-features
+
+      - name: Bump patch version
+        run: |
+          VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          MAJOR=$(echo $VER | cut -d. -f1)
+          MINOR=$(echo $VER | cut -d. -f2)
+          PATCH=$(echo $VER | cut -d. -f3)
+          NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
+
+      - name: Regenerate Cargo.lock
+        run: cargo generate-lockfile
+
+      - name: Create PR
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          title: "chore(data): update PSL from publicsuffix.org"
+          body: |
+            Automated monthly PSL data refresh.
+            Source: https://publicsuffix.org/list/public_suffix_list.dat
+          branch: chore/psl-update
+          commit-message: "chore(data): update PSL from publicsuffix.org"
+          delete-branch: true
