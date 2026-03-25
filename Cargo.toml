@@ -2,7 +2,7 @@
 name = "structured-public-domains"
 version = "0.0.2"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.92"
 authors = ["Structured World Foundation <foundation@sw.foundation>"]
 description = "Compact Public Suffix List (PSL) for Rust. ~35KB embedded JSON trie, O(depth) lookup. Auto-updated monthly from publicsuffix.org."
 documentation = "https://docs.rs/structured-public-domains/"
