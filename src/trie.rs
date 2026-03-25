@@ -23,19 +23,13 @@ static PSL: OnceLock<TrieNode> = OnceLock::new();
 
 fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
-        let decompressed = zstd::decode_all(PSL_DATA).unwrap_or_else(|e| {
-            // This is compile-time embedded data — if it fails, the build is broken.
-            // We can't use expect/unwrap due to lint, so provide empty fallback.
-            eprintln!("structured-public-domains: failed to decompress PSL data: {e}");
-            Vec::new()
-        });
-        serde_json::from_slice(&decompressed).unwrap_or_else(|e| {
-            eprintln!("structured-public-domains: failed to parse PSL trie: {e}");
-            TrieNode {
-                s: false,
-                c: HashMap::new(),
-            }
-        })
+        #[allow(clippy::expect_used)]
+        let decompressed =
+            zstd::decode_all(PSL_DATA).expect("embedded PSL data is corrupt — rebuild required");
+        #[allow(clippy::expect_used)]
+        let trie: TrieNode = serde_json::from_slice(&decompressed)
+            .expect("embedded PSL JSON is corrupt — rebuild required");
+        trie
     })
 }
 
@@ -46,7 +40,7 @@ pub struct DomainInfo {
     suffix: String,
     /// The registrable domain (eTLD+1), if the input has enough labels.
     registrable: Option<String>,
-    /// Whether the suffix is in the ICANN section (vs Private).
+    /// Whether the suffix matched an explicit PSL rule (vs the implicit `*` fallback rule).
     known: bool,
 }
 
@@ -112,7 +106,7 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
 
         // Check for exact match
         if let Some(child) = node.c.get(label_lower.as_str()) {
-            if child.s || !child.c.is_empty() {
+            if child.s {
                 suffix_depth = depth + 1;
                 known = true;
             }
@@ -171,6 +165,7 @@ pub fn registrable_domain(domain: &str) -> Option<String> {
 }
 
 #[cfg(test)]
+#[allow(clippy::panic)]
 mod tests {
     use super::*;
 

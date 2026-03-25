@@ -5,7 +5,7 @@
 //! - **32KB** embedded data (JSON trie compressed with zstd)
 //! - **O(depth)** trie walk lookup (typically 2-3 steps)
 //! - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
-//! - ICANN vs Private domain distinction
+//! - Includes ICANN and private domains from the Public Suffix List
 //! - Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
 //!
 //! # Example

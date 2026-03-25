@@ -27,7 +27,7 @@ jobs:
         run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o data/public_suffix_list.dat
 
       - name: Build trie + compress
-        run: cargo run --bin psl-build
+        run: python3 scripts/build-psl.py
 
       - name: Run tests
         run: cargo test --all-features
@@ -40,6 +40,9 @@ jobs:
           PATCH=$(echo $VER | cut -d. -f3)
           NEW="$MAJOR.$MINOR.$((PATCH + 1))"
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
+
+      - name: Regenerate Cargo.lock
+        run: cargo generate-lockfile
 
       - name: Create PR
         uses: peter-evans/create-pull-request@v7
