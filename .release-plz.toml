@@ -1,5 +1,6 @@
 [workspace]
 semver_check = false
+publish = false
 git_release_enable = true
 changelog_update = true
 git_tag_name = "v{{ version }}"
