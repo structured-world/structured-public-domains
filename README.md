@@ -10,7 +10,7 @@ Compact Public Suffix List (PSL) for Rust.
 - **35KB** embedded data (JSON trie compressed with zstd) — 25x smaller than `psl` crate
 - **O(depth)** trie walk lookup (typically 2-3 steps)
 - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
-- ICANN vs Private domain distinction
+- Based on the official Public Suffix List (ICANN and private sections)
 - Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
 
 **Terminology:** A *public suffix* (e.g., `com`, `co.uk`) is the part of a domain under which users can register names. The *registrable domain* (eTLD+1) is one label above the suffix (e.g., `example.co.uk`).

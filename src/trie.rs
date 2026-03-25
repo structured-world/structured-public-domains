@@ -85,7 +85,8 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
     }
 
     let labels: Vec<&str> = domain.rsplit('.').collect();
-    if labels.is_empty() {
+    // Reject domains with empty labels (leading dots, consecutive dots).
+    if labels.is_empty() || labels.iter().any(|label| label.is_empty()) {
         return None;
     }
 
@@ -94,18 +95,17 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
     let mut suffix_depth = 0;
     let mut known = false;
 
-    for (depth, &label) in labels.iter().enumerate() {
-        let label_lower = label.to_ascii_lowercase();
+    // Reusable buffer for lowercase labels (avoids allocation per iteration).
+    let mut label_buf = String::new();
 
-        // Check for exception rule: `!label` cancels wildcard
-        let exc_key = format!("!{label_lower}");
-        if node.c.contains_key(exc_key.as_str()) {
-            // Exception: this label is NOT part of the suffix
-            break;
+    for (depth, &label) in labels.iter().enumerate() {
+        label_buf.clear();
+        for ch in label.chars() {
+            label_buf.extend(ch.to_lowercase());
         }
 
-        // Check for exact match
-        if let Some(child) = node.c.get(label_lower.as_str()) {
+        // Check for exact match first (most common path).
+        if let Some(child) = node.c.get(label_buf.as_str()) {
             if child.s {
                 suffix_depth = depth + 1;
                 known = true;
@@ -114,10 +114,18 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
             continue;
         }
 
-        // Check for wildcard
+        // Check for wildcard (with exception handling).
         if node.c.contains_key("*") {
-            suffix_depth = depth + 1;
-            known = true;
+            // Exception rules (`!label`) cancel the wildcard for this specific label.
+            // Only 8 exceptions in the entire PSL, so this allocation is rare.
+            label_buf.insert(0, '!');
+            if node.c.contains_key(label_buf.as_str()) {
+                suffix_depth = depth;
+                known = true;
+            } else {
+                suffix_depth = depth + 1;
+                known = true;
+            }
             break;
         }
 
@@ -161,7 +169,7 @@ pub fn is_known_suffix(domain: &str) -> bool {
 ///
 /// Returns `None` if the domain is itself a public suffix.
 pub fn registrable_domain(domain: &str) -> Option<String> {
-    lookup(domain).and_then(|info| info.registrable.clone())
+    lookup(domain).and_then(|info| info.registrable)
 }
 
 #[cfg(test)]
@@ -226,5 +234,40 @@ mod tests {
             registrable_domain("www.example.co.uk"),
             Some("example.co.uk".to_string())
         );
+    }
+
+    // ── Wildcard rules ──
+
+    #[test]
+    fn wildcard_ck() {
+        // *.ck is a wildcard rule — any second-level under .ck is a suffix.
+        // "foo.ck" → suffix is "foo.ck" (wildcard match).
+        let info = lookup("example.foo.ck").unwrap_or_else(|| panic!("lookup failed"));
+        assert_eq!(info.suffix(), "foo.ck");
+        assert_eq!(info.registrable_domain(), Some("example.foo.ck"));
+        assert!(info.is_known());
+    }
+
+    // ── Exception rules ──
+
+    #[test]
+    fn exception_www_ck() {
+        // !www.ck is an exception to *.ck — www.ck is NOT a suffix,
+        // so the suffix falls back to "ck" and www.ck is registrable.
+        let info = lookup("www.ck").unwrap_or_else(|| panic!("lookup failed"));
+        assert_eq!(info.suffix(), "ck");
+        assert_eq!(info.registrable_domain(), Some("www.ck"));
+    }
+
+    // ── Edge cases: empty labels ──
+
+    #[test]
+    fn leading_dot() {
+        assert!(lookup(".example.com").is_none());
+    }
+
+    #[test]
+    fn consecutive_dots() {
+        assert!(lookup("example..com").is_none());
     }
 }
