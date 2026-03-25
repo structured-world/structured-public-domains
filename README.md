@@ -13,6 +13,8 @@ Compact Public Suffix List (PSL) for Rust.
 - ICANN vs Private domain distinction
 - Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
 
+**Terminology:** A *public suffix* (e.g., `com`, `co.uk`) is the part of a domain under which users can register names. The *registrable domain* (eTLD+1) is one label above the suffix (e.g., `example.co.uk`).
+
 ## Usage
 
 ```rust
