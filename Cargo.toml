@@ -18,7 +18,7 @@ serde_json = "1"
 zstd = "0.13"
 
 [dev-dependencies]
-criterion = { version = "0.7", features = ["html_reports"] }
+criterion = { version = "0.8", features = ["html_reports"] }
 
 [[bench]]
 name = "lookup"
