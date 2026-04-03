@@ -21,18 +21,16 @@ static PSL: OnceLock<TrieNode> = OnceLock::new();
 
 fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
-        let mut cursor = 0;
-        #[allow(clippy::expect_used, clippy::panic)]
-        let node = parse_node(PSL_DATA, &mut cursor)
-            .expect("embedded PSL data is corrupt — rebuild required");
-        #[allow(clippy::panic)]
-        if cursor != PSL_DATA.len() {
-            panic!(
-                "PSL blob has {} trailing bytes — rebuild required",
-                PSL_DATA.len() - cursor
-            );
-        }
-        node
+        #[allow(clippy::expect_used)]
+        (|| {
+            let mut cursor = 0;
+            let node = parse_node(PSL_DATA, &mut cursor)?;
+            if cursor != PSL_DATA.len() {
+                return None;
+            }
+            Some(node)
+        })()
+        .expect("embedded PSL data is corrupt — rebuild required")
     })
 }
 
@@ -63,11 +61,15 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
         return None;
     }
 
-    let mut children = Vec::with_capacity(num_children);
-    let mut prev_label: Option<Box<str>> = None;
+    let mut children: Vec<(Box<str>, TrieNode)> = Vec::with_capacity(num_children);
     for _ in 0_usize..num_children {
         let label_len = *data.get(*cursor)? as usize;
         *cursor += 1;
+
+        // PSL rules cannot produce empty labels.
+        if label_len == 0 {
+            return None;
+        }
 
         let label_end = *cursor + label_len;
         if label_end > data.len() {
@@ -80,16 +82,14 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
         let label = core::str::from_utf8(label_bytes).ok()?;
 
         // Verify sort order — binary search requires strictly ascending labels.
-        if let Some(ref prev) = prev_label
+        if let Some((prev, _)) = children.last()
             && label <= prev.as_ref()
         {
             return None;
         }
 
-        let boxed_label: Box<str> = Box::from(label);
         let child = parse_node(data, cursor)?;
-        prev_label = Some(boxed_label.clone());
-        children.push((boxed_label, child));
+        children.push((Box::from(label), child));
     }
 
     Some(TrieNode {
@@ -162,7 +162,7 @@ impl DomainInfo {
 /// assert_eq!(info.registrable_domain(), Some("example.co.uk"));
 /// ```
 pub fn lookup(domain: &str) -> Option<DomainInfo> {
-    let domain = domain.trim().trim_end_matches('.');
+    let domain = domain.trim().strip_suffix('.').unwrap_or(domain.trim());
     if domain.is_empty() {
         return None;
     }
@@ -379,6 +379,12 @@ mod tests {
     fn trailing_dot() {
         let info = lookup("example.com.").unwrap_or_else(|| panic!("lookup failed"));
         assert_eq!(info.suffix(), "com");
+    }
+
+    #[test]
+    fn multiple_trailing_dots_rejected() {
+        // Only one trailing dot (FQDN root) is valid; multiple are invalid.
+        assert!(lookup("example.com..").is_none());
     }
 
     #[test]
