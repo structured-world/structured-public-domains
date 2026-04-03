@@ -28,7 +28,7 @@ jobs:
         run: |
           # Extract only rules: strip comments, blank lines, sort
           extract_rules() {
-            grep -v '^\s*//' "$1" | grep -v '^\s*$' | sed 's/^[[:space:]]*//' | sort
+            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | sort
           }
 
           extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
