@@ -1,21 +1,19 @@
-//! PSL trie: decompress, parse, and lookup.
+//! PSL trie: parse compact binary format and lookup.
 
-use serde::Deserialize;
-use std::collections::HashMap;
 use std::sync::OnceLock;
 
-/// Compressed PSL trie data (zstd-compressed JSON).
-const PSL_DATA: &[u8] = include_bytes!("psl.json.zst");
+/// Compact binary PSL trie (DFS preorder, uncompressed).
+const PSL_DATA: &[u8] = include_bytes!("psl.bin");
 
 /// A node in the PSL trie.
-#[derive(Debug, Deserialize)]
+///
+/// Children are sorted by label, enabling binary search during lookup.
+#[derive(Debug)]
 struct TrieNode {
     /// Whether this node marks a public suffix boundary.
-    #[serde(default)]
-    s: bool,
-    /// Child nodes keyed by label.
-    #[serde(default)]
-    c: HashMap<Box<str>, TrieNode>,
+    suffix_boundary: bool,
+    /// Child nodes sorted by label.
+    children: Vec<(Box<str>, TrieNode)>,
 }
 
 /// Lazily initialized PSL trie.
@@ -23,14 +21,67 @@ static PSL: OnceLock<TrieNode> = OnceLock::new();
 
 fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
+        let mut cursor = 0;
         #[allow(clippy::expect_used)]
-        let decompressed =
-            zstd::decode_all(PSL_DATA).expect("embedded PSL data is corrupt — rebuild required");
-        #[allow(clippy::expect_used)]
-        let trie: TrieNode = serde_json::from_slice(&decompressed)
-            .expect("embedded PSL JSON is corrupt — rebuild required");
-        trie
+        let node = parse_node(PSL_DATA, &mut cursor)
+            .expect("embedded PSL data is corrupt — rebuild required");
+        node
     })
+}
+
+/// Parse a single trie node from the binary format.
+///
+/// Format: `[flags:u8] [num_children:u16_le] [child₁ child₂ ...]`
+/// Child:  `[label_len:u8] [label_bytes...] [child_node]`
+fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
+    let flags = *data.get(*cursor)?;
+    *cursor += 1;
+
+    let lo = *data.get(*cursor)? as u16;
+    *cursor += 1;
+    let hi = *data.get(*cursor)? as u16;
+    *cursor += 1;
+    let num_children = lo | (hi << 8);
+
+    let mut children = Vec::with_capacity(num_children as usize);
+    for _ in 0..num_children {
+        let label_len = *data.get(*cursor)? as usize;
+        *cursor += 1;
+
+        let label_end = *cursor + label_len;
+        if label_end > data.len() {
+            return None;
+        }
+        let label_bytes = &data[*cursor..label_end];
+        *cursor = label_end;
+
+        // Labels are stored as UTF-8 in the binary format (already lowercased).
+        let label = core::str::from_utf8(label_bytes).ok()?;
+        let child = parse_node(data, cursor)?;
+        children.push((Box::from(label), child));
+    }
+
+    Some(TrieNode {
+        suffix_boundary: flags & 1 != 0,
+        children,
+    })
+}
+
+impl TrieNode {
+    /// Find a child node by label using binary search.
+    fn child(&self, label: &str) -> Option<&TrieNode> {
+        self.children
+            .binary_search_by(|(k, _)| k.as_ref().cmp(label))
+            .ok()
+            .map(|i| &self.children[i].1)
+    }
+
+    /// Check if a child with the given label exists.
+    fn has_child(&self, label: &str) -> bool {
+        self.children
+            .binary_search_by(|(k, _)| k.as_ref().cmp(label))
+            .is_ok()
+    }
 }
 
 /// Result of a PSL lookup.
@@ -106,8 +157,8 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
         }
 
         // Check for exact match first (most common path).
-        if let Some(child) = node.c.get(label_buf.as_str()) {
-            if child.s {
+        if let Some(child) = node.child(label_buf.as_str()) {
+            if child.suffix_boundary {
                 suffix_depth = depth + 1;
                 known = true;
             }
@@ -116,11 +167,11 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
         }
 
         // Check for wildcard (with exception handling).
-        if node.c.contains_key("*") {
+        if node.has_child("*") {
             // Exception rules (`!label`) cancel the wildcard for this specific label.
             // Only 8 exceptions in the entire PSL, so this allocation is rare.
             label_buf.insert(0, '!');
-            if node.c.contains_key(label_buf.as_str()) {
+            if node.has_child(label_buf.as_str()) {
                 suffix_depth = depth;
                 known = true;
             } else {
@@ -237,7 +288,7 @@ mod tests {
         );
     }
 
-    // ── Wildcard rules ──
+    // -- Wildcard rules --
 
     #[test]
     fn wildcard_ck() {
@@ -249,7 +300,7 @@ mod tests {
         assert!(info.is_known());
     }
 
-    // ── Exception rules ──
+    // -- Exception rules --
 
     #[test]
     fn exception_www_ck() {
@@ -260,7 +311,7 @@ mod tests {
         assert_eq!(info.registrable_domain(), Some("www.ck"));
     }
 
-    // ── Edge cases: empty labels ──
+    // -- Edge cases: empty labels --
 
     #[test]
     fn leading_dot() {

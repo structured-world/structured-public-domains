@@ -7,7 +7,8 @@ Compact Public Suffix List (PSL) for Rust.
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-- **35KB** embedded data (JSON trie compressed with zstd)
+- **Zero** runtime dependencies
+- **108KB** embedded data (compact binary trie)
 - **~3M lookups/sec** on a single core (~325 ns per lookup)
 - **O(depth)** trie walk (typically 2-3 steps)
 - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
@@ -44,19 +45,20 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Private domain (`mysite.github.io`) | 376 ns | 2.7M/s |
 | Long chain (`very.deep...co.uk`) | 460 ns | 2.2M/s |
 
-**Runtime memory:** The PSL trie is decompressed and parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~1.1 MB (10,835-node trie with ~9,000 suffix rules). The 35KB compressed blob is embedded in the binary at compile time.
+**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (10,835-node trie with sorted `Vec` children and binary search lookup). The 108KB binary blob is embedded in the binary at compile time.
 
 ## Why not `psl`?
 
 | | `psl` | `structured-public-domains` |
 |---|---|---|
-| Embedded data | ~876KB (codegen match tree) | **35KB** (zstd-compressed trie) |
-| Source size | 2.4MB codegen | 300 lines + 35KB blob |
-| Runtime deps | None | `serde_json`, `zstd` |
+| Embedded data | ~876KB (codegen match tree) | **108KB** (compact binary trie) |
+| Source size | 2.4MB codegen | 300 lines + 108KB blob |
+| Runtime deps | None | **None** |
+| Runtime memory | N/A (static) | **~530KB** |
 | Lookup | O(depth) match tree | O(depth) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 
-Both crates have comparable lookup speed. `psl` trades a larger binary for zero runtime dependencies. `structured-public-domains` trades a smaller binary and auto-updates for a `zstd` dependency (C FFI; pure Rust via `structured-zstd` is planned — see [#9](https://github.com/structured-world/structured-public-domains/issues/9)).
+Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data, halved runtime memory, and daily auto-updates via GitHub Actions.
 
 ## Support the Project
 

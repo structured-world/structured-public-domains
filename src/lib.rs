@@ -2,7 +2,8 @@
 //!
 //! Compact Public Suffix List (PSL) for Rust.
 //!
-//! - **~35KB** embedded data (JSON trie compressed with zstd)
+//! - **Zero** runtime dependencies
+//! - **108KB** embedded data (compact binary trie)
 //! - **O(depth)** trie walk lookup (typically 2-3 steps)
 //! - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
 //! - Includes ICANN and private domains from the Public Suffix List
@@ -23,4 +24,4 @@
 
 mod trie;
 
-pub use trie::{DomainInfo, is_known_suffix, lookup, registrable_domain};
+pub use trie::{is_known_suffix, lookup, registrable_domain, DomainInfo};
