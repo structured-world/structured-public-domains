@@ -60,6 +60,7 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
     }
 
     let mut children = Vec::with_capacity(num_children);
+    let mut prev_label: Option<Box<str>> = None;
     for _ in 0_usize..num_children {
         let label_len = *data.get(*cursor)? as usize;
         *cursor += 1;
@@ -73,8 +74,18 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
 
         // Labels are stored as UTF-8 in the binary format (already lowercased).
         let label = core::str::from_utf8(label_bytes).ok()?;
+
+        // Verify sort order — binary search requires strictly ascending labels.
+        if let Some(ref prev) = prev_label
+            && label <= prev.as_ref()
+        {
+            return None;
+        }
+
+        let boxed_label: Box<str> = Box::from(label);
         let child = parse_node(data, cursor)?;
-        children.push((Box::from(label), child));
+        prev_label = Some(boxed_label.clone());
+        children.push((boxed_label, child));
     }
 
     Some(TrieNode {
