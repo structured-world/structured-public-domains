@@ -43,6 +43,10 @@ fn psl() -> &'static TrieNode {
 fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
     let flags = *data.get(*cursor)?;
     *cursor += 1;
+    // Reject reserved flag bits — only bit 0 (suffix boundary) is defined.
+    if flags & !1 != 0 {
+        return None;
+    }
 
     let lo = *data.get(*cursor)? as u16;
     *cursor += 1;
@@ -318,6 +322,21 @@ mod tests {
         let data: Vec<u8> = vec![0, 0xe8, 0x03, 0, 0, 0];
         let mut cursor = 0;
         assert!(parse_node(&data, &mut cursor).is_none());
+    }
+
+    #[test]
+    fn parse_node_rejects_unsorted_or_duplicate_children() {
+        let leaf = encode_node(0, &[]);
+
+        // Unsorted: "b" before "a" violates binary search invariant.
+        let unsorted = encode_node(0, &[("b", &leaf), ("a", &leaf)]);
+        let mut cursor = 0;
+        assert!(parse_node(&unsorted, &mut cursor).is_none());
+
+        // Duplicate: two "a" children.
+        let duplicate = encode_node(0, &[("a", &leaf), ("a", &leaf)]);
+        cursor = 0;
+        assert!(parse_node(&duplicate, &mut cursor).is_none());
     }
 
     // -- Lookup tests --
