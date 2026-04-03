@@ -1,5 +1,7 @@
 name: Update PSL Data
 
+# Static group: this workflow always targets the single chore/psl-update branch.
+# No cancel-in-progress — a run that already committed must not be killed mid-push.
 concurrency:
   group: update-psl
 
@@ -29,9 +31,10 @@ jobs:
       - name: Check for rule changes
         id: diff
         run: |
-          # Extract only rules: strip comments, blank lines, sort
+          # Extract only rules: strip comments/metadata, blank lines, sort deterministically.
+          # Intentionally ignores VERSION/COMMIT header changes — only rule diffs matter.
           extract_rules() {
-            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | sort
+            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | LC_ALL=C sort
           }
 
           extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
@@ -75,7 +78,7 @@ jobs:
 
       - name: Update Cargo.lock
         if: steps.diff.outputs.changed == 'true'
-        run: cargo update --workspace
+        run: cargo update --package structured-public-domains
 
       - name: Create PR
         if: steps.diff.outputs.changed == 'true'
