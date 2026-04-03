@@ -22,14 +22,16 @@ static PSL: OnceLock<TrieNode> = OnceLock::new();
 fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
         let mut cursor = 0;
-        #[allow(clippy::expect_used)]
+        #[allow(clippy::expect_used, clippy::panic)]
         let node = parse_node(PSL_DATA, &mut cursor)
             .expect("embedded PSL data is corrupt — rebuild required");
-        assert!(
-            cursor == PSL_DATA.len(),
-            "PSL blob has {trailing} trailing bytes — rebuild required",
-            trailing = PSL_DATA.len() - cursor
-        );
+        #[allow(clippy::panic)]
+        if cursor != PSL_DATA.len() {
+            panic!(
+                "PSL blob has {} trailing bytes — rebuild required",
+                PSL_DATA.len() - cursor
+            );
+        }
         node
     })
 }
@@ -175,16 +177,15 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
         // (e.g., *.futurecms.at must still match even though "ex" exists as a child).
         if node.has_child("*") {
             // Exception rules (`!label`) cancel the wildcard for this specific label.
-            let mut exc_buf = String::with_capacity(1 + label_buf.len());
-            exc_buf.push('!');
-            exc_buf.push_str(&label_buf);
-            if node.has_child(exc_buf.as_str()) {
+            label_buf.insert(0, '!');
+            if node.has_child(label_buf.as_str()) {
                 suffix_depth = depth;
                 known = true;
             } else {
                 suffix_depth = depth + 1;
                 known = true;
             }
+            label_buf.remove(0); // restore label for exact match below
         }
 
         // Try exact match — descend deeper for potentially more specific rules.

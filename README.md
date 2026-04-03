@@ -8,9 +8,9 @@ Compact Public Suffix List (PSL) for Rust.
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 - **Zero** runtime dependencies
-- **108KB** embedded data (compact binary trie)
-- **~3M lookups/sec** on a single core (~325 ns per lookup)
-- **O(depth)** trie walk (typically 2-3 steps)
+- **~108KB** embedded data (compact binary trie)
+- **~2.4M lookups/sec** on a single core (~420 ns per lookup)
+- **O(depth * log k)** trie traversal with per-node binary search (typically 2-3 steps)
 - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
 - Based on the official Public Suffix List (ICANN and private sections)
 - Checked daily against [publicsuffix.org](https://publicsuffix.org/)
@@ -38,14 +38,14 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 
 | Benchmark | Time | Throughput |
 |-----------|------|-----------|
-| Simple (`example.com`) | 325 ns | 3.1M/s |
-| Nested (`www.example.co.uk`) | 387 ns | 2.6M/s |
-| Deep subdomain (`a.b.c.d.example.com`) | 393 ns | 2.5M/s |
-| Bare TLD (`com`) | 141 ns | 7.1M/s |
-| Private domain (`mysite.github.io`) | 376 ns | 2.7M/s |
-| Long chain (`very.deep...co.uk`) | 460 ns | 2.2M/s |
+| Simple (`example.com`) | ~420 ns | ~2.4M/s |
+| Nested (`www.example.co.uk`) | ~425 ns | ~2.4M/s |
+| Deep subdomain (`a.b.c.d.example.com`) | ~500 ns | ~2.0M/s |
+| Bare TLD (`com`) | ~195 ns | ~5.1M/s |
+| Private domain (`mysite.github.io`) | ~450 ns | ~2.2M/s |
+| Long chain (`very.deep...co.uk`) | ~500 ns | ~2.0M/s |
 
-**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (10,835-node trie with sorted `Vec` children and binary search lookup). The 108KB binary blob is embedded in the binary at compile time.
+**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (sorted `Vec` children with binary search lookup). The ~108KB binary blob is embedded in the binary at compile time.
 
 ## Why not `psl`?
 
