@@ -23,4 +23,4 @@
 
 mod trie;
 
-pub use trie::{is_known_suffix, lookup, registrable_domain, DomainInfo};
+pub use trie::{DomainInfo, is_known_suffix, lookup, registrable_domain};
