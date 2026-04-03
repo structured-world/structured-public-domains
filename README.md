@@ -55,10 +55,10 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Source size | 2.4MB codegen | 300 lines + 108KB blob |
 | Runtime deps | None | **None** |
 | Runtime memory | N/A (static) | **~530KB** |
-| Lookup | O(depth) match tree | O(depth) trie walk |
+| Lookup | O(depth) match tree | O(depth * log k) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 
-Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data, halved runtime memory, and daily auto-updates via GitHub Actions.
+Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data, ~50% less runtime memory (vs our previous JSON+zstd version), and daily auto-updates via GitHub Actions.
 
 ## Support the Project
 

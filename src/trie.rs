@@ -25,6 +25,11 @@ fn psl() -> &'static TrieNode {
         #[allow(clippy::expect_used)]
         let node = parse_node(PSL_DATA, &mut cursor)
             .expect("embedded PSL data is corrupt — rebuild required");
+        assert!(
+            cursor == PSL_DATA.len(),
+            "PSL blob has {trailing} trailing bytes — rebuild required",
+            trailing = PSL_DATA.len() - cursor
+        );
         node
     })
 }
@@ -43,8 +48,17 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
     *cursor += 1;
     let num_children = lo | (hi << 8);
 
-    let mut children = Vec::with_capacity(num_children as usize);
-    for _ in 0..num_children {
+    // Validate num_children against remaining bytes to prevent OOM on corrupt data.
+    // Each child needs at least 4 bytes: 1 (label_len) + 0 (label) + 3 (flags + num_children).
+    const MIN_CHILD_ENCODED_LEN: usize = 4;
+    let remaining = data.len().checked_sub(*cursor)?;
+    let num_children = num_children as usize;
+    if num_children > remaining / MIN_CHILD_ENCODED_LEN {
+        return None;
+    }
+
+    let mut children = Vec::with_capacity(num_children);
+    for _ in 0_usize..num_children {
         let label_len = *data.get(*cursor)? as usize;
         *cursor += 1;
 
@@ -156,7 +170,24 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
             label_buf.extend(ch.to_lowercase());
         }
 
-        // Check for exact match first (most common path).
+        // Record wildcard match as fallback BEFORE trying exact match.
+        // This ensures wildcards are not shadowed by non-boundary exact children
+        // (e.g., *.futurecms.at must still match even though "ex" exists as a child).
+        if node.has_child("*") {
+            // Exception rules (`!label`) cancel the wildcard for this specific label.
+            let mut exc_buf = String::with_capacity(1 + label_buf.len());
+            exc_buf.push('!');
+            exc_buf.push_str(&label_buf);
+            if node.has_child(exc_buf.as_str()) {
+                suffix_depth = depth;
+                known = true;
+            } else {
+                suffix_depth = depth + 1;
+                known = true;
+            }
+        }
+
+        // Try exact match — descend deeper for potentially more specific rules.
         if let Some(child) = node.child(label_buf.as_str()) {
             if child.suffix_boundary {
                 suffix_depth = depth + 1;
@@ -166,21 +197,7 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
             continue;
         }
 
-        // Check for wildcard (with exception handling).
-        if node.has_child("*") {
-            // Exception rules (`!label`) cancel the wildcard for this specific label.
-            // Only 8 exceptions in the entire PSL, so this allocation is rare.
-            label_buf.insert(0, '!');
-            if node.has_child(label_buf.as_str()) {
-                suffix_depth = depth;
-                known = true;
-            } else {
-                suffix_depth = depth + 1;
-                known = true;
-            }
-            break;
-        }
-
+        // No exact match — wildcard (if any) was already recorded above.
         break;
     }
 
@@ -228,6 +245,70 @@ pub fn registrable_domain(domain: &str) -> Option<String> {
 #[allow(clippy::panic)]
 mod tests {
     use super::*;
+
+    // -- Binary parser direct tests --
+
+    /// Encode a trie node into binary format (mirrors build-psl.py serialization).
+    fn encode_node(flags: u8, children: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.push(flags);
+        let count = children.len() as u16;
+        out.extend_from_slice(&count.to_le_bytes());
+        for (label, child) in children {
+            let label_bytes = label.as_bytes();
+            out.push(label_bytes.len() as u8);
+            out.extend_from_slice(label_bytes);
+            out.extend_from_slice(child);
+        }
+        out
+    }
+
+    #[test]
+    fn parse_node_tiny_trie_with_special_labels() {
+        let wildcard = encode_node(1, &[]);
+        let exception = encode_node(0, &[]);
+        let utf8 = encode_node(1, &[]);
+
+        // Children sorted by label (binary search invariant).
+        let data = encode_node(
+            0,
+            &[
+                ("!city", &exception),
+                ("*", &wildcard),
+                ("\u{4F8B}\u{5B50}", &utf8),
+            ],
+        );
+
+        let mut cursor = 0;
+        let root = parse_node(&data, &mut cursor).unwrap_or_else(|| panic!("parse failed"));
+
+        assert_eq!(cursor, data.len());
+        assert!(!root.suffix_boundary);
+        assert!(root.has_child("!city"));
+        assert!(root.has_child("*"));
+        assert!(root.has_child("\u{4F8B}\u{5B50}"));
+        assert!(
+            root.child("*")
+                .unwrap_or_else(|| panic!("no *"))
+                .suffix_boundary
+        );
+        assert!(
+            !root
+                .child("!city")
+                .unwrap_or_else(|| panic!("no !city"))
+                .suffix_boundary
+        );
+    }
+
+    #[test]
+    fn parse_node_rejects_truncated_data() {
+        // Valid header but claims 1000 children with only 3 remaining bytes.
+        let data: Vec<u8> = vec![0, 0xe8, 0x03, 0, 0, 0];
+        let mut cursor = 0;
+        assert!(parse_node(&data, &mut cursor).is_none());
+    }
+
+    // -- Lookup tests --
 
     #[test]
     fn simple_com() {
@@ -309,6 +390,28 @@ mod tests {
         let info = lookup("www.ck").unwrap_or_else(|| panic!("lookup failed"));
         assert_eq!(info.suffix(), "ck");
         assert_eq!(info.registrable_domain(), Some("www.ck"));
+    }
+
+    // -- Wildcard not shadowed by exact child --
+
+    #[test]
+    fn wildcard_not_shadowed_by_exact_child() {
+        // PSL has: *.futurecms.at, *.ex.futurecms.at, *.in.futurecms.at
+        // "ex" exists as exact child (path to *.ex.futurecms.at) but is NOT a suffix boundary.
+        // The wildcard *.futurecms.at must still match — ex.futurecms.at IS a public suffix.
+        let info = lookup("ex.futurecms.at").unwrap_or_else(|| panic!("lookup failed"));
+        assert_eq!(info.suffix(), "ex.futurecms.at");
+        assert_eq!(info.registrable_domain(), None);
+        assert!(info.is_known());
+    }
+
+    #[test]
+    fn deeper_wildcard_under_exact_child() {
+        // *.ex.futurecms.at — test.ex.futurecms.at is a suffix
+        let info = lookup("site.test.ex.futurecms.at").unwrap_or_else(|| panic!("lookup failed"));
+        assert_eq!(info.suffix(), "test.ex.futurecms.at");
+        assert_eq!(info.registrable_domain(), Some("site.test.ex.futurecms.at"));
+        assert!(info.is_known());
     }
 
     // -- Edge cases: empty labels --
