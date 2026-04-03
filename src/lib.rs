@@ -6,7 +6,7 @@
 //! - **O(depth)** trie walk lookup (typically 2-3 steps)
 //! - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
 //! - Includes ICANN and private domains from the Public Suffix List
-//! - Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
+//! - Checked daily against [publicsuffix.org](https://publicsuffix.org/)
 //!
 //! # Example
 //!
