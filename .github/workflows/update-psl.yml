@@ -76,9 +76,9 @@ jobs:
           NEW="$MAJOR.$MINOR.$((PATCH + 1))"
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
 
-      - name: Update Cargo.lock
+      - name: Refresh Cargo.lock after version bump
         if: steps.diff.outputs.changed == 'true'
-        run: cargo update --package structured-public-domains
+        run: cargo check --all-features
 
       - name: Create PR
         if: steps.diff.outputs.changed == 'true'

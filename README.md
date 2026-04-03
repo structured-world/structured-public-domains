@@ -12,7 +12,7 @@ Compact Public Suffix List (PSL) for Rust.
 - **O(depth)** trie walk (typically 2-3 steps)
 - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
 - Based on the official Public Suffix List (ICANN and private sections)
-- Auto-updated monthly from [publicsuffix.org](https://publicsuffix.org/)
+- Checked daily against [publicsuffix.org](https://publicsuffix.org/)
 
 **Terminology:** A *public suffix* (e.g., `com`, `co.uk`) is the part of a domain under which users can register names. The *registrable domain* (eTLD+1) is one label above the suffix (e.g., `example.co.uk`).
 
@@ -54,7 +54,7 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Source size | 2.4MB codegen | 300 lines + 35KB blob |
 | Runtime deps | None | `serde_json`, `zstd` |
 | Lookup | O(depth) match tree | O(depth) trie walk |
-| Auto-update | New crate version | Monthly GitHub Actions PR |
+| Auto-update | New crate version | Daily GitHub Actions check |
 
 Both crates have comparable lookup speed. `psl` trades a larger binary for zero runtime dependencies. `structured-public-domains` trades a smaller binary and auto-updates for a `zstd` dependency (C FFI; pure Rust via `structured-zstd` is planned — see [#9](https://github.com/structured-world/structured-public-domains/issues/9)).
 

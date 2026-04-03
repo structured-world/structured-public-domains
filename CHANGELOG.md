@@ -11,4 +11,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- PSL trie lookup — 35KB embedded, O(depth), auto-updated monthly ([#2](https://github.com/structured-world/structured-public-domains/pull/2))
+- PSL trie lookup — 35KB embedded, O(depth), checked daily ([#2](https://github.com/structured-world/structured-public-domains/pull/2))

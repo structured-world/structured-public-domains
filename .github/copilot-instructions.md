@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Compact Public Suffix List (PSL) implementation for Rust. ~35KB embedded JSON trie compressed with zstd. O(depth) lookup. Auto-updated monthly from publicsuffix.org.
+Compact Public Suffix List (PSL) implementation for Rust. ~35KB embedded JSON trie compressed with zstd. O(depth) lookup. Checked daily against publicsuffix.org.
 
 ## Review Scope Rules
 
