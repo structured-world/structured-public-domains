@@ -2,7 +2,7 @@ name: Update PSL Data
 
 on:
   schedule:
-    - cron: '0 6 1 * *'  # 1st of each month, 06:00 UTC
+    - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
 
 jobs:
@@ -20,19 +20,48 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-
       - name: Download fresh PSL
-        run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o data/public_suffix_list.dat
+        run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o /tmp/psl-fresh.dat
+
+      - name: Check for rule changes
+        id: diff
+        run: |
+          # Extract only rules: strip comments, blank lines, sort
+          extract_rules() {
+            grep -v '^\s*//' "$1" | grep -v '^\s*$' | sed 's/^[[:space:]]*//' | sort
+          }
+
+          extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
+          extract_rules /tmp/psl-fresh.dat > /tmp/rules-fresh.txt
+
+          if diff -q /tmp/rules-current.txt /tmp/rules-fresh.txt > /dev/null 2>&1; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No rule changes detected"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "Rules changed:"
+            diff --unified=0 /tmp/rules-current.txt /tmp/rules-fresh.txt | head -30
+          fi
+
+      - name: Update data file
+        if: steps.diff.outputs.changed == 'true'
+        run: cp /tmp/psl-fresh.dat data/public_suffix_list.dat
+
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.diff.outputs.changed == 'true'
+      - uses: Swatinem/rust-cache@v2
+        if: steps.diff.outputs.changed == 'true'
 
       - name: Build trie + compress
+        if: steps.diff.outputs.changed == 'true'
         run: python3 scripts/build-psl.py
 
       - name: Run tests
+        if: steps.diff.outputs.changed == 'true'
         run: cargo test --all-features
 
       - name: Bump patch version
+        if: steps.diff.outputs.changed == 'true'
         run: |
           VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
           MAJOR=$(echo $VER | cut -d. -f1)
@@ -42,16 +71,25 @@ jobs:
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
 
       - name: Regenerate Cargo.lock
+        if: steps.diff.outputs.changed == 'true'
         run: cargo generate-lockfile
 
       - name: Create PR
+        if: steps.diff.outputs.changed == 'true'
+        id: pr
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ steps.app-token.outputs.token }}
           title: "chore(data): update PSL from publicsuffix.org"
           body: |
-            Automated monthly PSL data refresh.
+            Automated daily PSL data refresh.
             Source: https://publicsuffix.org/list/public_suffix_list.dat
           branch: chore/psl-update
           commit-message: "chore(data): update PSL from publicsuffix.org"
           delete-branch: true
+
+      - name: Enable auto-merge
+        if: steps.pr.outputs.pull-request-number
+        run: gh pr merge --auto --squash "${{ steps.pr.outputs.pull-request-number }}"
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
