@@ -31,9 +31,20 @@ jobs:
       - name: Check for rule changes
         id: diff
         run: |
-          # Extract only rules: strip comments/metadata, blank lines, sort, deduplicate.
+          # Extract and canonicalize rules identically to build-psl.py:
+          # strip comments/blanks, drop leading dot, lowercase — so case-only
+          # or dot-only upstream edits don't trigger false version bumps.
           extract_rules() {
-            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | LC_ALL=C sort -u
+            python3 - "$1" <<'PY' | LC_ALL=C sort -u
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as f:
+    for raw in f:
+        line = raw.strip()
+        if not line or line.startswith("//"):
+            continue
+        print(line.lstrip(".").lower())
+PY
           }
 
           extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
@@ -45,9 +56,9 @@ jobs:
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
 
-            # Compute added/removed domains
-            comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
-            comm -23 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/removed.txt
+            # Compute added/removed domains (LC_ALL=C matches sort collation)
+            LC_ALL=C comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
+            LC_ALL=C comm -23 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/removed.txt
 
             ADDED=$(wc -l < /tmp/added.txt | tr -d ' ')
             REMOVED=$(wc -l < /tmp/removed.txt | tr -d ' ')
