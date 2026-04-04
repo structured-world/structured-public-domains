@@ -1,0 +1,51 @@
+{
+  "name": "@structured-world/structured-public-domains",
+  "version": "0.0.4",
+  "description": "Compact Public Suffix List (PSL). ~108KB binary trie, ~2.4M lookups/sec, checked daily against publicsuffix.org.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/structured-world/structured-public-domains"
+  },
+  "keywords": [
+    "psl",
+    "public-suffix",
+    "domain",
+    "tld",
+    "validation",
+    "wasm",
+    "webassembly"
+  ],
+  "type": "module",
+  "main": "./node.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "node": {
+        "import": {
+          "types": "./index.d.ts",
+          "default": "./node.js"
+        }
+      },
+      "default": {
+        "types": "./browser.d.ts",
+        "default": "./browser.js"
+      }
+    },
+    "./browser": {
+      "types": "./browser.d.ts",
+      "default": "./browser.js"
+    }
+  },
+  "files": [
+    "*.js",
+    "*.d.ts",
+    "*.wasm"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

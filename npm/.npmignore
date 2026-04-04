@@ -1,0 +1,3 @@
+# Source files not needed in the published package
+*.rs
+Cargo.*

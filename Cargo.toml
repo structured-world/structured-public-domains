@@ -12,7 +12,14 @@ readme = "README.md"
 keywords = ["psl", "public-suffix", "domain", "tld", "validation"]
 categories = ["web-programming", "parser-implementations"]
 
+[features]
+wasm = ["dep:wasm-bindgen"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

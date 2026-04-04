@@ -134,6 +134,13 @@ PY
           PATCH=$(echo $VER | cut -d. -f3)
           NEW="$MAJOR.$MINOR.$((PATCH + 1))"
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
+          # Sync version to npm package
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('npm/package.json', 'utf8'));
+            p.version = '$NEW';
+            fs.writeFileSync('npm/package.json', JSON.stringify(p, null, 2) + '\n');
+          "
 
       - name: Refresh Cargo.lock after version bump
         if: steps.diff.outputs.changed == 'true'
