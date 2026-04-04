@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-Compact Public Suffix List (PSL) implementation for Rust. ~35KB embedded JSON trie compressed with zstd. O(depth) lookup. Checked daily against publicsuffix.org.
+Compact Public Suffix List (PSL) implementation for Rust. Zero dependencies, ~108KB embedded binary trie. O(depth * log k) lookup. Checked daily against publicsuffix.org.
 
 ## Review Scope Rules
 
@@ -12,4 +12,4 @@ Compact Public Suffix List (PSL) implementation for Rust. ~35KB embedded JSON tr
 
 - **No `unwrap()` or `expect()`** on any code path: `#[deny(clippy::unwrap_used, clippy::expect_used)]` enforced
 - **Clippy:** Must pass `cargo clippy --all-features -- -D warnings`
-- PSL data is auto-generated — do NOT manually edit `src/psl.json.zst` or generated data files
+- PSL data is auto-generated — do NOT manually edit `src/psl.bin` or generated data files
