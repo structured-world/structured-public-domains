@@ -282,7 +282,7 @@ mod tests {
     #[test]
     fn parse_node_tiny_trie_with_special_labels() {
         let wildcard = encode_node(1, &[]);
-        let exception = encode_node(0, &[]);
+        let exception = encode_node(1, &[]);
         let utf8 = encode_node(1, &[]);
 
         // Children sorted by label (binary search invariant).
@@ -309,8 +309,7 @@ mod tests {
                 .suffix_boundary
         );
         assert!(
-            !root
-                .child("!city")
+            root.child("!city")
                 .unwrap_or_else(|| panic!("no !city"))
                 .suffix_boundary
         );
@@ -337,6 +336,21 @@ mod tests {
         let duplicate = encode_node(0, &[("a", &leaf), ("a", &leaf)]);
         cursor = 0;
         assert!(parse_node(&duplicate, &mut cursor).is_none());
+    }
+
+    #[test]
+    fn parse_node_rejects_reserved_flag_bits() {
+        let data = encode_node(0b10, &[]);
+        let mut cursor = 0;
+        assert!(parse_node(&data, &mut cursor).is_none());
+    }
+
+    #[test]
+    fn parse_node_rejects_empty_labels() {
+        let leaf = encode_node(0, &[]);
+        let data = encode_node(0, &[("", &leaf)]);
+        let mut cursor = 0;
+        assert!(parse_node(&data, &mut cursor).is_none());
     }
 
     // -- Lookup tests --
