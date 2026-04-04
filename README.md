@@ -7,8 +7,8 @@ Compact Public Suffix List (PSL) for Rust.
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-- **Zero** runtime dependencies
-- **~108KB** embedded data (compact binary trie)
+- **One** runtime dependency (`structured-zstd` — pure Rust, no FFI)
+- **~37KB** embedded data (zstd-compressed binary trie)
 - **~2.4M lookups/sec** on a single core (~420 ns per lookup)
 - **O(depth * log k)** trie traversal with per-node binary search (typically 2-3 steps)
 - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
@@ -45,20 +45,20 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Private domain (`mysite.github.io`) | ~450 ns | ~2.2M/s |
 | Long chain (`very.deep...co.uk`) | ~500 ns | ~2.0M/s |
 
-**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (sorted `Vec` children with binary search lookup). The ~108KB binary blob is embedded in the binary at compile time.
+**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (sorted `Vec` children with binary search lookup). The ~37KB zstd-compressed blob is embedded at compile time and decompressed once on first access.
 
 ## Why not `psl`?
 
 | | `psl` | `structured-public-domains` |
 |---|---|---|
-| Embedded data | ~876KB (codegen match tree) | **108KB** (compact binary trie) |
-| Source size | 2.4MB codegen | 300 lines + 108KB blob |
-| Runtime deps | None | **None** |
+| Embedded data | ~876KB (codegen match tree) | **37KB** (zstd-compressed binary trie) |
+| Source size | 2.4MB codegen | 300 lines + 37KB blob |
+| Runtime deps | None | `structured-zstd` (pure Rust) |
 | Runtime memory | N/A (static) | **~530KB** |
 | Lookup | O(depth) match tree | O(depth * log k) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 
-Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data, ~50% less runtime memory (vs our previous JSON+zstd version), and daily auto-updates via GitHub Actions.
+Both crates have comparable lookup speed. `structured-public-domains` has ~24x smaller embedded data, uses a single pure-Rust dependency, and auto-updates daily via GitHub Actions with domain-level changelogs.
 
 ## Support the Project
 

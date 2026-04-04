@@ -31,10 +31,9 @@ jobs:
       - name: Check for rule changes
         id: diff
         run: |
-          # Extract only rules: strip comments/metadata, blank lines, sort deterministically.
-          # Intentionally ignores VERSION/COMMIT header changes — only rule diffs matter.
+          # Extract only rules: strip comments/metadata, blank lines, sort, deduplicate.
           extract_rules() {
-            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | LC_ALL=C sort
+            grep -v '^[[:space:]]*//' "$1" | grep -v '^[[:space:]]*$' | sed 's/^[[:space:]]*//' | LC_ALL=C sort -u
           }
 
           extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
@@ -45,8 +44,56 @@ jobs:
             echo "No rule changes detected"
           else
             echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "Rules changed:"
-            { diff --unified=0 /tmp/rules-current.txt /tmp/rules-fresh.txt || true; } | head -30
+
+            # Compute added/removed domains
+            comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
+            comm -23 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/removed.txt
+
+            ADDED=$(wc -l < /tmp/added.txt | tr -d ' ')
+            REMOVED=$(wc -l < /tmp/removed.txt | tr -d ' ')
+            echo "added=$ADDED" >> "$GITHUB_OUTPUT"
+            echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
+            echo "Domain changes: +$ADDED -$REMOVED"
+
+            # Build PR body
+            {
+              echo "Automated daily PSL data refresh."
+              echo "Source: https://publicsuffix.org/list/public_suffix_list.dat"
+              echo ""
+              echo "## Domain changes: +${ADDED} -${REMOVED}"
+              echo ""
+              if [ "$ADDED" -gt 0 ]; then
+                echo "### Added (${ADDED})"
+                echo '```'
+                head -200 /tmp/added.txt
+                [ "$ADDED" -gt 200 ] && echo "... and $((ADDED - 200)) more"
+                echo '```'
+                echo ""
+              fi
+              if [ "$REMOVED" -gt 0 ]; then
+                echo "### Removed (${REMOVED})"
+                echo '```'
+                head -200 /tmp/removed.txt
+                [ "$REMOVED" -gt 200 ] && echo "... and $((REMOVED - 200)) more"
+                echo '```'
+              fi
+            } > /tmp/pr-body.md
+
+            # Build commit message
+            {
+              echo "feat(data): update PSL (+${ADDED} -${REMOVED})"
+              echo ""
+              if [ "$ADDED" -gt 0 ]; then
+                echo "Added (${ADDED}):"
+                head -50 /tmp/added.txt | sed 's/^/  + /'
+                [ "$ADDED" -gt 50 ] && echo "  ... and $((ADDED - 50)) more"
+              fi
+              if [ "$REMOVED" -gt 0 ]; then
+                echo "Removed (${REMOVED}):"
+                head -50 /tmp/removed.txt | sed 's/^/  - /'
+                [ "$REMOVED" -gt 50 ] && echo "  ... and $((REMOVED - 50)) more"
+              fi
+            } > /tmp/commit-msg.txt
           fi
 
       - name: Update data file
@@ -58,7 +105,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: steps.diff.outputs.changed == 'true'
 
-      - name: Build binary trie
+      - name: Build compressed binary trie
         if: steps.diff.outputs.changed == 'true'
         run: python3 scripts/build-psl.py
 
@@ -80,18 +127,26 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         run: cargo check --all-features
 
+      - name: Read commit message
+        if: steps.diff.outputs.changed == 'true'
+        id: commit-msg
+        run: |
+          {
+            echo "message<<COMMIT_EOF"
+            cat /tmp/commit-msg.txt
+            echo "COMMIT_EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Create PR
         if: steps.diff.outputs.changed == 'true'
         id: pr
         uses: peter-evans/create-pull-request@v8
         with:
           token: ${{ steps.app-token.outputs.token }}
-          title: "chore(data): update PSL from publicsuffix.org"
-          body: |
-            Automated daily PSL data refresh.
-            Source: https://publicsuffix.org/list/public_suffix_list.dat
+          title: "feat(data): update PSL (+${{ steps.diff.outputs.added }} -${{ steps.diff.outputs.removed }})"
+          body-path: /tmp/pr-body.md
           branch: chore/psl-update
-          commit-message: "chore(data): update PSL from publicsuffix.org"
+          commit-message: ${{ steps.commit-msg.outputs.message }}
           delete-branch: true
 
       - name: Enable auto-merge

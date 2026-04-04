@@ -1,9 +1,10 @@
 //! PSL trie: parse compact binary format and lookup.
 
+use std::io::Read;
 use std::sync::OnceLock;
 
-/// Compact binary PSL trie (DFS preorder, uncompressed).
-const PSL_DATA: &[u8] = include_bytes!("psl.bin");
+/// Compact binary PSL trie (DFS preorder, zstd-compressed).
+const PSL_ZSTD: &[u8] = include_bytes!("psl.bin.zst");
 
 /// A node in the PSL trie.
 ///
@@ -23,9 +24,12 @@ fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
         #[allow(clippy::expect_used)]
         (|| {
+            let mut decoder = structured_zstd::decoding::StreamingDecoder::new(PSL_ZSTD).ok()?;
+            let mut data = Vec::new();
+            decoder.read_to_end(&mut data).ok()?;
             let mut cursor = 0;
-            let node = parse_node(PSL_DATA, &mut cursor)?;
-            if cursor != PSL_DATA.len() {
+            let node = parse_node(&data, &mut cursor)?;
+            if cursor != data.len() {
                 return None;
             }
             Some(node)

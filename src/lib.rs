@@ -2,8 +2,8 @@
 //!
 //! Compact Public Suffix List (PSL) for Rust.
 //!
-//! - **Zero** runtime dependencies
-//! - **~108KB** embedded data (compact binary trie)
+//! - **One** runtime dependency (`structured-zstd` — pure Rust, no FFI)
+//! - **~37KB** embedded data (zstd-compressed binary trie)
 //! - **O(depth * log k)** lookup via trie traversal with per-node binary search (typically 2-3 steps)
 //! - Wildcard (`*.jp`) and exception (`!metro.tokyo.jp`) rules
 //! - Includes ICANN and private domains from the Public Suffix List

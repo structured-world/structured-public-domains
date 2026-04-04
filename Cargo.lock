@@ -439,6 +439,16 @@ name = "structured-public-domains"
 version = "0.0.4"
 dependencies = [
  "criterion",
+ "structured-zstd",
+]
+
+[[package]]
+name = "structured-zstd"
+version = "0.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2f1afc5aad8ee5fdddb3ea6e091d408058f8abe2e004f65c51c2f6e36d37833a"
+dependencies = [
+ "twox-hash",
 ]
 
 [[package]]
@@ -461,6 +471,12 @@ dependencies = [
  "serde",
  "serde_json",
 ]
+
+[[package]]
+name = "twox-hash"
+version = "2.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea3136b675547379c4bd395ca6b938e5ad3c3d20fad76e7fe85f9e0d011419c"
 
 [[package]]
 name = "unicode-ident"

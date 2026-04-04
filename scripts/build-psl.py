@@ -12,13 +12,15 @@ Reads:  data/public_suffix_list.dat
 Writes: src/psl.bin
 """
 
+import shutil
 import struct
+import subprocess
 import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 PSL_PATH = REPO_ROOT / "data" / "public_suffix_list.dat"
-OUTPUT_PATH = REPO_ROOT / "src" / "psl.bin"
+OUTPUT_PATH = REPO_ROOT / "src" / "psl.bin.zst"
 
 
 def build_trie(psl_path: Path) -> dict:
@@ -88,6 +90,23 @@ def count_nodes(node: dict) -> int:
     return total
 
 
+def compress_zstd(data: bytes) -> bytes:
+    """Compress data with zstd -19 via CLI."""
+    zstd = shutil.which("zstd")
+    if zstd is None:
+        print("zstd not found — install zstd (brew install zstd / apt install zstd)", file=sys.stderr)
+        sys.exit(1)
+    result = subprocess.run(
+        [zstd, "-19", "--no-progress", "-c"],
+        input=data,
+        capture_output=True,
+    )
+    if result.returncode != 0:
+        print(f"zstd compression failed: {result.stderr.decode()}", file=sys.stderr)
+        sys.exit(1)
+    return result.stdout
+
+
 def main() -> None:
     if not PSL_PATH.exists():
         print(f"PSL data not found: {PSL_PATH}", file=sys.stderr)
@@ -100,10 +119,13 @@ def main() -> None:
     print(f"Parsed {n_rules} PSL rules, {n_nodes} trie nodes")
 
     binary = serialize_node(trie)
-    OUTPUT_PATH.write_bytes(binary)
+    compressed = compress_zstd(bytes(binary))
+    OUTPUT_PATH.write_bytes(compressed)
 
-    kb = len(binary) / 1024
-    print(f"Written {kb:.0f} KB to {OUTPUT_PATH}")
+    raw_kb = len(binary) / 1024
+    zst_kb = len(compressed) / 1024
+    ratio = len(compressed) / len(binary) * 100
+    print(f"Binary trie: {raw_kb:.0f} KB → zstd: {zst_kb:.0f} KB ({ratio:.0f}%) → {OUTPUT_PATH}")
 
 
 if __name__ == "__main__":
