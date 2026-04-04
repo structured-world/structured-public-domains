@@ -4,7 +4,7 @@ version = "0.0.4"
 edition = "2024"
 rust-version = "1.92"
 authors = ["Structured World Foundation <foundation@sw.foundation>"]
-description = "Compact Public Suffix List (PSL) for Rust. ~35KB embedded JSON trie, O(depth) lookup. Checked daily against publicsuffix.org."
+description = "Compact Public Suffix List (PSL) for Rust. Zero dependencies, ~108KB embedded binary trie, O(depth * log k) lookup. Checked daily against publicsuffix.org."
 documentation = "https://docs.rs/structured-public-domains/"
 repository = "https://github.com/structured-world/structured-public-domains"
 license = "Apache-2.0"
@@ -13,9 +13,6 @@ keywords = ["psl", "public-suffix", "domain", "tld", "validation"]
 categories = ["web-programming", "parser-implementations"]
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-zstd = "0.13"
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }

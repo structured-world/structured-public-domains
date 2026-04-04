@@ -58,7 +58,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         if: steps.diff.outputs.changed == 'true'
 
-      - name: Build trie + compress
+      - name: Build binary trie
         if: steps.diff.outputs.changed == 'true'
         run: python3 scripts/build-psl.py
 
