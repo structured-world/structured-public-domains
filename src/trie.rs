@@ -53,8 +53,8 @@ fn parse_node(data: &[u8], cursor: &mut usize) -> Option<TrieNode> {
     let num_children = lo | (hi << 8);
 
     // Validate num_children against remaining bytes to prevent OOM on corrupt data.
-    // Each child needs at least 4 bytes: 1 (label_len) + 0 (label) + 3 (flags + num_children).
-    const MIN_CHILD_ENCODED_LEN: usize = 4;
+    // Each child needs at least 5 bytes: 1 (label_len) + 1 (label byte, empty rejected) + 3 (flags + num_children).
+    const MIN_CHILD_ENCODED_LEN: usize = 5;
     let remaining = data.len().checked_sub(*cursor)?;
     let num_children = num_children as usize;
     if num_children > remaining / MIN_CHILD_ENCODED_LEN {
@@ -162,7 +162,8 @@ impl DomainInfo {
 /// assert_eq!(info.registrable_domain(), Some("example.co.uk"));
 /// ```
 pub fn lookup(domain: &str) -> Option<DomainInfo> {
-    let domain = domain.trim().strip_suffix('.').unwrap_or(domain.trim());
+    let trimmed = domain.trim();
+    let domain = trimmed.strip_suffix('.').unwrap_or(trimmed);
     if domain.is_empty() {
         return None;
     }
@@ -272,6 +273,11 @@ mod tests {
         out.extend_from_slice(&count.to_le_bytes());
         for (label, child) in children {
             let label_bytes = label.as_bytes();
+            assert!(
+                label_bytes.len() <= u8::MAX as usize,
+                "label length exceeds binary format limit: {}",
+                label_bytes.len()
+            );
             out.push(label_bytes.len() as u8);
             out.extend_from_slice(label_bytes);
             out.extend_from_slice(child);
