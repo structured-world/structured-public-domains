@@ -4,6 +4,7 @@ Compact Public Suffix List (PSL) for Rust.
 
 [![CI](https://github.com/structured-world/structured-public-domains/actions/workflows/ci.yml/badge.svg)](https://github.com/structured-world/structured-public-domains/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/structured-public-domains.svg)](https://crates.io/crates/structured-public-domains)
+[![npm](https://img.shields.io/npm/v/@structured-world/structured-public-domains.svg)](https://www.npmjs.com/package/@structured-world/structured-public-domains)
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
@@ -17,7 +18,7 @@ Compact Public Suffix List (PSL) for Rust.
 
 **Terminology:** A *public suffix* (e.g., `com`, `co.uk`) is the part of a domain under which users can register names. The *registrable domain* (eTLD+1) is one label above the suffix (e.g., `example.co.uk`).
 
-## Usage
+## Usage (Rust)
 
 ```rust
 use structured_public_domains::{lookup, registrable_domain, is_known_suffix};
@@ -30,6 +31,39 @@ assert!(info.is_known());
 // Helpers
 assert_eq!(registrable_domain("sub.example.com"), Some("example.com".to_string()));
 assert!(is_known_suffix("example.com"));
+```
+
+## Usage (JavaScript / TypeScript)
+
+The same PSL trie is available as an npm package compiled to WebAssembly.
+
+```sh
+npm install @structured-world/structured-public-domains
+```
+
+### Node.js / NestJS
+
+The wasm module loads synchronously on import — no `init()` call needed.
+
+```typescript
+import { lookup, registrableDomain, isKnownSuffix } from '@structured-world/structured-public-domains';
+
+const info = lookup('www.example.co.uk');
+// info.suffix           → "co.uk"
+// info.registrableDomain → "example.co.uk"
+// info.known            → true
+
+registrableDomain('sub.example.com');  // "example.com"
+isKnownSuffix('example.com');          // true
+```
+
+### Browser
+
+```typescript
+import { init, lookup } from '@structured-world/structured-public-domains/browser';
+
+await init();   // fetch + compile wasm (once)
+const info = lookup('www.example.co.uk');
 ```
 
 ## Performance

@@ -24,4 +24,7 @@
 
 mod trie;
 
+#[cfg(feature = "wasm")]
+mod wasm;
+
 pub use trie::{DomainInfo, is_known_suffix, lookup, registrable_domain};

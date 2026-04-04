@@ -103,6 +103,35 @@ jobs:
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
+  wasm:
+    needs: lint
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: wasm
+      - name: Install wasm-pack
+        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - name: Build wasm
+        run: ./scripts/build-wasm.sh
+      - name: Verify npm package
+        working-directory: npm
+        run: |
+          node -e "
+            const pkg = require('./package.json');
+            const fs = require('fs');
+            console.log('package:', pkg.name, pkg.version);
+            if (!fs.existsSync('structured_public_domains_bg.wasm')) {
+              process.exit(1);
+            }
+            console.log('wasm size:', fs.statSync('structured_public_domains_bg.wasm').size, 'bytes');
+          "
+
   bench:
     needs: lint
     timeout-minutes: 15

@@ -439,6 +439,7 @@ name = "structured-public-domains"
 version = "0.0.4"
 dependencies = [
  "criterion",
+ "wasm-bindgen",
 ]
 
 [[package]]
