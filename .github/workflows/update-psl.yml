@@ -98,6 +98,7 @@ PY
                 echo "Added (${ADDED}):"
                 head -50 /tmp/added.txt | sed 's/^/  + /'
                 [ "$ADDED" -gt 50 ] && echo "  ... and $((ADDED - 50)) more"
+                echo ""
               fi
               if [ "$REMOVED" -gt 0 ]; then
                 echo "Removed (${REMOVED}):"
