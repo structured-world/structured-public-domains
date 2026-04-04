@@ -169,8 +169,13 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
     }
 
     let labels: Vec<&str> = domain.rsplit('.').collect();
-    // Reject domains with empty labels (leading dots, consecutive dots).
-    if labels.is_empty() || labels.iter().any(|label| label.is_empty()) {
+    // Reject domains with empty labels (leading dots, consecutive dots)
+    // and PSL sentinel labels (* and !prefix) which are internal trie nodes.
+    if labels.is_empty()
+        || labels
+            .iter()
+            .any(|label| label.is_empty() || *label == "*" || label.starts_with('!'))
+    {
         return None;
     }
 
@@ -469,6 +474,21 @@ mod tests {
         assert_eq!(info.suffix(), "test.ex.futurecms.at");
         assert_eq!(info.registrable_domain(), Some("site.test.ex.futurecms.at"));
         assert!(info.is_known());
+    }
+
+    // -- Edge cases: sentinel labels rejected --
+
+    #[test]
+    fn wildcard_label_in_input_rejected() {
+        // "*.ck" and "foo.*.ck" must not walk internal wildcard trie nodes.
+        assert!(lookup("*.ck").is_none());
+        assert!(lookup("foo.*.ck").is_none());
+    }
+
+    #[test]
+    fn exception_label_in_input_rejected() {
+        // "!www.ck" must not walk internal exception trie nodes.
+        assert!(lookup("!www.ck").is_none());
     }
 
     // -- Edge cases: empty labels --

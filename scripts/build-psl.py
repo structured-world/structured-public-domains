@@ -38,6 +38,9 @@ def build_trie(psl_path: Path) -> dict:
             node = trie
             for label in labels:
                 label_lower = label.lower()
+                if not label_lower:
+                    print(f"Empty label in PSL rule: {rule}", file=sys.stderr)
+                    sys.exit(1)
                 if label_lower not in node["c"]:
                     node["c"][label_lower] = {"s": False, "c": {}}
                 node = node["c"][label_lower]
