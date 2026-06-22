@@ -1,3 +1,7 @@
+// The ".js" specifier is the ESM convention for type re-exports: under
+// node16/nodenext resolution it resolves to the sibling index.d.ts. Writing
+// "./index.d.ts" here would be a TypeScript error (TS2846 / TS5097 — importing
+// a declaration-file extension is not allowed without allowImportingTsExtensions).
 export { DomainInfo, lookup, registrableDomain, isKnownSuffix } from "./index.js";
 
 /**
