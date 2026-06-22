@@ -4,4 +4,5 @@
 /npm/structured_public_domains_bg.wasm
 /npm/structured_public_domains.js
 /npm/structured_public_domains.d.ts
-/npm/structured_public_domains_bg.js
+/npm/structured_public_domains_node.cjs
+/npm/structured_public_domains_node.d.cts

@@ -1,15 +1,10 @@
-// ESM Node entry — reads the wasm file synchronously and initialises it during
-// module evaluation (top-level await), so no init() call is needed. CommonJS
-// consumers use ./node.cjs instead (see package.json "exports").
-import { readFileSync } from "node:fs";
-import init, {
-  lookup as _lookup,
+// CommonJS entry — the nodejs-target glue loads the wasm synchronously at
+// require() time, so every function is usable immediately with no init() call.
+const {
+  lookup: _lookup,
   registrableDomain,
   isKnownSuffix,
-} from "./structured_public_domains.js";
-
-const wasmPath = new URL("./structured_public_domains_bg.wasm", import.meta.url);
-await init({ module_or_path: readFileSync(wasmPath) });
+} = require("./structured_public_domains_node.cjs");
 
 /**
  * Look up a domain in the Public Suffix List.
@@ -20,7 +15,7 @@ await init({ module_or_path: readFileSync(wasmPath) });
  * @param {string} domain
  * @returns {{ suffix: string, registrableDomain: string | undefined, known: boolean } | undefined}
  */
-export function lookup(domain) {
+function lookup(domain) {
   const info = _lookup(domain);
   if (info == null) return undefined;
   const result = {
@@ -32,4 +27,4 @@ export function lookup(domain) {
   return result;
 }
 
-export { registrableDomain, isKnownSuffix };
+module.exports = { lookup, registrableDomain, isKnownSuffix };

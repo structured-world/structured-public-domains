@@ -43,18 +43,27 @@ npm install @structured-world/structured-public-domains
 
 ### Node.js / NestJS
 
-The wasm module loads synchronously on import — no `init()` call needed.
+No `init()` call is needed — the wasm module is loaded during module
+initialization. Both ESM (`import`) and CommonJS (`require`) are supported: the
+CommonJS entry loads the wasm synchronously, while the ESM entry loads it during
+module evaluation (top-level await).
 
 ```typescript
+// ESM
 import { lookup, registrableDomain, isKnownSuffix } from '@structured-world/structured-public-domains';
 
 const info = lookup('www.example.co.uk');
-// info.suffix           → "co.uk"
+// info.suffix            → "co.uk"
 // info.registrableDomain → "example.co.uk"
-// info.known            → true
+// info.known             → true
 
 registrableDomain('sub.example.com');  // "example.com"
 isKnownSuffix('example.com');          // true
+```
+
+```javascript
+// CommonJS (e.g. default NestJS)
+const { lookup, registrableDomain, isKnownSuffix } = require('@structured-world/structured-public-domains');
 ```
 
 ### Browser

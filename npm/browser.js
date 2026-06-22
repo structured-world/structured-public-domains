@@ -14,7 +14,10 @@ import _init, {
  * `BufferSource`, or `WebAssembly.Module`.
  */
 export async function init(input) {
-  await _init(input);
+  // Forward as the current single-object form; `undefined` keeps the default
+  // (fetch the sibling .wasm). Passing raw bytes/URL positionally is deprecated
+  // by wasm-bindgen, so wrap any caller-provided input.
+  await _init(input === undefined ? undefined : { module_or_path: input });
 }
 
 /**
