@@ -21,6 +21,7 @@ jobs:
           CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token }}
 
   publish-npm:
+    needs: publish-crate
     runs-on: ubuntu-latest
     environment: release
     permissions:
@@ -38,8 +39,9 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Install wasm-pack
-        run: curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
 
       - name: Build wasm
         run: ./scripts/build-wasm.sh
