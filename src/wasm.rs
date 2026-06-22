@@ -1,15 +1,15 @@
 //! WebAssembly bindings via `wasm-bindgen`.
 //!
-//! Exposes [`lookup`], [`registrable_domain`][registrable_domain_fn], and
-//! [`is_known_suffix`][is_known_suffix_fn] to JavaScript consumers.
+//! Exposes [`lookup`], [`registrable_domain`], and
+//! [`is_known_suffix`] to JavaScript consumers.
 
 use wasm_bindgen::prelude::*;
 
 /// Result of a PSL lookup, returned as an opaque JS object.
 ///
 /// JavaScript consumers receive property accessors; the JS wrapper layer
-/// copies these into a plain object and calls [`free`](WasmDomainInfo::free)
-/// so callers never deal with manual memory management.
+/// copies these into a plain object and calls the generated JS `.free()`
+/// method so callers never deal with manual memory management.
 #[wasm_bindgen(js_name = "DomainInfo")]
 pub struct WasmDomainInfo {
     suffix: String,
