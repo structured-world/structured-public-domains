@@ -24,10 +24,12 @@ wasm-pack build "$ROOT" \
   -- --features wasm
 
 # --- 2. Copy artefacts into npm/ -----------------------------------------------
+# `--target web` inlines the glue into the main `.js`, so there is no `_bg.js`
+# shim to copy. Every artefact below is required: a missing file must fail the
+# build loudly rather than silently producing a broken but publishable package.
 cp "$TMP_DIR/structured_public_domains_bg.wasm" "$NPM_DIR/"
 cp "$TMP_DIR/structured_public_domains.js"      "$NPM_DIR/"
-cp "$TMP_DIR/structured_public_domains_bg.js"   "$NPM_DIR/" 2>/dev/null || true
-cp "$TMP_DIR/structured_public_domains.d.ts"    "$NPM_DIR/structured_public_domains.d.ts" 2>/dev/null || true
+cp "$TMP_DIR/structured_public_domains.d.ts"    "$NPM_DIR/"
 
 # --- 3. Sync version from Cargo.toml → package.json ----------------------------
 CARGO_VERSION=$(grep '^version' "$ROOT/Cargo.toml" | head -1 | sed 's/.*"\(.*\)"/\1/')
