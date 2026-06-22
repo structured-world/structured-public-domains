@@ -36,15 +36,15 @@ jobs:
           # or dot-only upstream edits don't trigger false version bumps.
           extract_rules() {
             python3 - "$1" <<'PY' | LC_ALL=C sort -u
-import sys
+          import sys
 
-with open(sys.argv[1], encoding="utf-8") as f:
-    for raw in f:
-        line = raw.strip()
-        if not line or line.startswith("//"):
-            continue
-        print(line.lstrip(".").lower())
-PY
+          with open(sys.argv[1], encoding="utf-8") as f:
+              for raw in f:
+                  line = raw.strip()
+                  if not line or line.startswith("//"):
+                      continue
+                  print(line.lstrip(".").lower())
+          PY
           }
 
           extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
@@ -129,9 +129,9 @@ PY
         if: steps.diff.outputs.changed == 'true'
         run: |
           VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          MAJOR=$(echo $VER | cut -d. -f1)
-          MINOR=$(echo $VER | cut -d. -f2)
-          PATCH=$(echo $VER | cut -d. -f3)
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          PATCH=$(echo "$VER" | cut -d. -f3)
           NEW="$MAJOR.$MINOR.$((PATCH + 1))"
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
           # Sync version to npm package
