@@ -44,6 +44,16 @@ jobs:
         working-directory: npm
         run: npm ci
 
+      # Cargo.toml is the single source of truth for the version. release-plz
+      # bumps it but does not know about npm/package.json, so sync it here to
+      # keep the crate and the npm package on the same version every release.
+      - name: Sync npm version to crate
+        working-directory: npm
+        run: |
+          CRATE_VERSION=$(grep '^version' ../Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${CRATE_VERSION}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          echo "npm version synced to ${CRATE_VERSION}"
+
       # prepublishOnly builds the ESM + CJS + dts bundle and embeds the data.
       - name: Publish to npm
         working-directory: npm
