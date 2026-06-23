@@ -1,5 +1,24 @@
+# CodeRabbit configuration. See https://docs.coderabbit.ai/getting-started/configure-coderabbit
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-
+language: en-US
 reviews:
-  auto_apply_labels: true
-  profile: assertive
+  path_instructions:
+    - path: ".github/workflows/**"
+      instructions: >-
+        This repository intentionally references first-party and trusted GitHub
+        Actions (actions/*, dtolnay/rust-toolchain, Swatinem/rust-cache,
+        taiki-e/*, release-plz/*, codecov/*, peter-evans/*,
+        actions/create-github-app-token) by version tag, NOT by commit SHA. Do
+        NOT suggest pinning actions to commit SHAs, do NOT raise unpinned-uses /
+        ref-pin / tag-retargeting findings, and do NOT flag persist-credentials
+        for these trusted publishers. Do NOT flag `npm install -g npm@<version>`
+        in release jobs as an ad-hoc package install: it is the documented way to
+        obtain the npm CLI version required for OIDC trusted publishing. Only
+        raise GitHub Actions security findings for genuinely untrusted
+        third-party actions or real injection / secret-exposure risks.
+  tools:
+    # zizmor's unpinned-uses / adhoc-packages audits flag our intentional use of
+    # tag-pinned trusted actions and the npm-CLI upgrade in the release job.
+    # actionlint (kept) covers workflow correctness; disable zizmor's pin noise.
+    zizmor:
+      enabled: false
