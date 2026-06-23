@@ -30,10 +30,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -43,13 +39,11 @@ jobs:
       - name: Upgrade npm for trusted publishing
         run: npm install -g npm@latest
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack
+      - name: Install deps
+        working-directory: npm
+        run: npm ci
 
-      - name: Build wasm
-        run: ./scripts/build-wasm.sh
-
+      # prepublishOnly builds the ESM + CJS + dts bundle and embeds the data.
       - name: Publish to npm
         working-directory: npm
         run: |
