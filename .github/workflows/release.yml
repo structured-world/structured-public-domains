@@ -35,9 +35,10 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
-      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships an older CLI.
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships an older
+      # CLI. Pin the version so release behavior stays deterministic.
       - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.1
 
       - name: Install deps
         working-directory: npm
