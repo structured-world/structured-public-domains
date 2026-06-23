@@ -98,9 +98,11 @@ describe("invalid and sentinel input", () => {
 
 describe("unknown suffixes", () => {
   it("falls back to the implicit * rule for unknown TLDs", () => {
-    const info = lookup("example.invalidtld");
-    expect(info?.suffix).toBe("invalidtld");
-    expect(info?.registrableDomain).toBe("example.invalidtld");
+    // `.invalid` is permanently reserved (RFC 2606), so it can never appear in
+    // a future PSL update and make this expectation flaky.
+    const info = lookup("example.invalid");
+    expect(info?.suffix).toBe("invalid");
+    expect(info?.registrableDomain).toBe("example.invalid");
     expect(info?.known).toBe(false);
   });
 });
