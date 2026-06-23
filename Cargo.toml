@@ -12,7 +12,19 @@ readme = "README.md"
 keywords = ["psl", "public-suffix", "domain", "tld", "validation"]
 categories = ["web-programming", "parser-implementations"]
 
+[features]
+wasm = ["dep:wasm-bindgen"]
+
+# `cdylib` is required for the wasm-bindgen build; `rlib` is what Rust
+# consumers link against. Cargo has no per-target crate-type, so `cdylib` is
+# also produced on native builds — that is a few seconds of extra link time
+# for this tiny zero-dependency crate and links cleanly on every CI target
+# (including i686), so the bindings stay here rather than in a companion crate.
+[lib]
+crate-type = ["cdylib", "rlib"]
+
 [dependencies]
+wasm-bindgen = { version = "0.2", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
