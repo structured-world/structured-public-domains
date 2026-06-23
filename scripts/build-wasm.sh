@@ -47,6 +47,11 @@ cp "$TMP_WEB/structured_public_domains.d.ts"    "$NPM_DIR/"
 cp "$TMP_NODE/structured_public_domains.js"     "$NPM_DIR/structured_public_domains_node.cjs"
 cp "$TMP_NODE/structured_public_domains.d.ts"   "$NPM_DIR/structured_public_domains_node.d.cts"
 
+# npm only renders a README that sits in the package root (npm/), not the repo
+# root. Mirror the canonical README in so npmjs.com shows docs instead of a bare
+# "no README" page. Relative links/images resolve against repository.url on npm.
+cp "$ROOT/README.md" "$NPM_DIR/README.md"
+
 # --- 3. Sync version from Cargo.toml → package.json ----------------------------
 CARGO_VERSION=$(grep '^version' "$ROOT/Cargo.toml" | head -1 | sed 's/.*"\(.*\)"/\1/')
 

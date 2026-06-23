@@ -1,6 +1,6 @@
 {
   "name": "@structured-world/structured-public-domains",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Compact Public Suffix List (PSL). ~108KB binary trie, ~2.4M lookups/sec, checked daily against publicsuffix.org.",
   "license": "Apache-2.0",
   "repository": {
@@ -46,7 +46,8 @@
     "*.cjs",
     "*.d.ts",
     "*.d.cts",
-    "*.wasm"
+    "*.wasm",
+    "README.md"
   ],
   "publishConfig": {
     "access": "public"

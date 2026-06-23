@@ -39,6 +39,10 @@ jobs:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships an older CLI.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
       - uses: taiki-e/install-action@v2
         with:
           tool: wasm-pack
@@ -56,5 +60,3 @@ jobs:
             exit 0
           fi
           npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
