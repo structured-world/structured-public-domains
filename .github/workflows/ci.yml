@@ -97,41 +97,63 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@cargo-llvm-cov
       - run: cargo llvm-cov --all-features --lcov --output-path lcov.info
-      - uses: codecov/codecov-action@v6
+      - uses: codecov/codecov-action@v7
         with:
           files: lcov.info
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
-  wasm:
+  npm:
+    needs: lint
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install deps
+        working-directory: npm
+        run: npm ci
+      - name: Typecheck
+        working-directory: npm
+        run: npm run typecheck
+      - name: Unit tests
+        working-directory: npm
+        run: npm test
+      - name: Build (ESM + CJS + dts)
+        working-directory: npm
+        run: npm run build
+      - name: Smoke-test both module formats
+        working-directory: npm
+        run: |
+          node --input-type=module -e "import { lookup } from './dist/index.js'; if (lookup('www.example.co.uk')?.suffix !== 'co.uk') process.exit(1)"
+          node --input-type=commonjs -e "const { registrableDomain } = require('./dist/index.cjs'); if (registrableDomain('sub.example.com') !== 'example.com') process.exit(1)"
+
+  parity:
     needs: lint
     timeout-minutes: 15
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: wasm
-      - uses: taiki-e/install-action@v2
+          prefix-key: parity
+      - uses: actions/setup-node@v4
         with:
-          tool: wasm-pack
-      - name: Build wasm
-        run: ./scripts/build-wasm.sh
-      - name: Verify npm package
+          node-version: "22"
+      - name: Build Rust harness
+        run: cargo build --release --example parity
+      - name: Build npm package
         working-directory: npm
+        run: npm ci && npm run build
+      - name: Generate corpus and diff Rust vs TS
         run: |
-          node -e "
-            const pkg = require('./package.json');
-            const fs = require('fs');
-            console.log('package:', pkg.name, pkg.version);
-            if (!fs.existsSync('structured_public_domains_bg.wasm')) {
-              process.exit(1);
-            }
-            console.log('wasm size:', fs.statSync('structured_public_domains_bg.wasm').size, 'bytes');
-          "
+          python3 scripts/parity-domains.py > /tmp/domains.txt
+          ./target/release/examples/parity < /tmp/domains.txt > /tmp/rust.out
+          node npm/scripts/parity.mjs < /tmp/domains.txt > /tmp/ts.out
+          diff /tmp/rust.out /tmp/ts.out
 
   bench:
     needs: lint
