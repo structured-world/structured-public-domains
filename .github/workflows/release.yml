@@ -30,22 +30,31 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-unknown-unknown
-
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
           registry-url: "https://registry.npmjs.org"
 
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack
+      # Trusted publishing (OIDC) requires npm >= 11.5.1; Node 22 ships an older
+      # CLI. Pin the version so release behavior stays deterministic.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@11.5.1
 
-      - name: Build wasm
-        run: ./scripts/build-wasm.sh
+      - name: Install deps
+        working-directory: npm
+        run: npm ci
 
+      # Cargo.toml is the single source of truth for the version. release-plz
+      # bumps it but does not know about npm/package.json, so sync it here to
+      # keep the crate and the npm package on the same version every release.
+      - name: Sync npm version to crate
+        working-directory: npm
+        run: |
+          CRATE_VERSION=$(grep '^version' ../Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          node -e "const fs=require('fs');const p=require('./package.json');p.version='${CRATE_VERSION}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n')"
+          echo "npm version synced to ${CRATE_VERSION}"
+
+      # prepublishOnly builds the ESM + CJS + dts bundle and embeds the data.
       - name: Publish to npm
         working-directory: npm
         run: |
@@ -56,5 +65,3 @@ jobs:
             exit 0
           fi
           npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
