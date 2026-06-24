@@ -77,6 +77,29 @@ const bytes = pslData();   // Uint8Array — a defensive copy of the trie blob
 The JS lookup is verified byte-for-byte against the Rust implementation over the
 entire PSL on every CI run, so both languages return identical results.
 
+### Tiny build (runtime-fetched, no embedded data)
+
+For consumers who want always-fresh PSL **without bumping the package version**,
+the `/tiny` entry ships *without* the embedded blob. It fetches the prebuilt
+binary trie at runtime and caches it locally (Node: temp file with a TTL;
+browser: CacheStorage). After the first `await load()`, the lookup API is
+identical and synchronous.
+
+```typescript
+import { load, registrableDomain } from '@structured-world/structured-public-domains/tiny';
+
+await load();                              // fetch + cache once (default: jsDelivr CDN)
+registrableDomain('sub.example.co.uk');    // "example.co.uk"
+
+// Options: custom source, TTL, cache dir, or force refresh.
+await load({ url: 'https://psl.example.com/psl.bin', cacheTtlMs: 3_600_000, force: true });
+```
+
+The data is the same `psl.bin` shipped in this package (served via jsDelivr by
+default), so results are identical to the embedded build. Use the full `.` entry
+when you want zero network and instant startup; use `/tiny` when install size and
+always-current data matter more.
+
 ## Performance
 
 Benchmarks on Apple M-series (criterion, `cargo bench`):
