@@ -95,9 +95,12 @@ registrableDomain('sub.example.co.uk');    // "example.co.uk"
 await load({ url: 'https://psl.example.com/psl.bin', cacheTtlMs: 3_600_000, force: true });
 ```
 
-The data is the same `psl.bin` shipped in this package (served via jsDelivr by
-default), so results are identical to the embedded build. Use the full `.` entry
-when you want zero network and instant startup; use `/tiny` when install size and
+The default source is the same `psl.bin` served from this package's jsDelivr CDN,
+pinned to the installed `major.minor` range — so it always tracks the latest
+PSL-data patch release (same trie format) but never a future format-breaking
+version the bundled parser can't read. Results are identical to the embedded
+build. Use the full `.` entry when you want zero network and instant startup; use
+`/tiny` when install size and
 always-current data matter more.
 
 ## Performance

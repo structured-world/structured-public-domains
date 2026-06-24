@@ -11,9 +11,15 @@
 
 import { lookupTrie, parseTrie, type DomainInfo, type TrieNode } from "./trie.js";
 
-/** Default data source: the prebuilt trie served from the npm package via jsDelivr's CDN. */
-export const DEFAULT_PSL_URL =
-  "https://cdn.jsdelivr.net/npm/@structured-world/structured-public-domains@latest/dist/psl.bin";
+// Injected at build time (tsup `define`) as this package's "major.minor" range;
+// falls back to "0.0" when run from source (tests). Pinning the CDN URL to the
+// range means the tiny entry fetches PSL-data patch releases (same trie format)
+// but never a future format-breaking release the shipped parser cannot read.
+declare const __PSL_PKG_RANGE__: string;
+const PSL_RANGE = typeof __PSL_PKG_RANGE__ !== "undefined" ? __PSL_PKG_RANGE__ : "0.0";
+
+/** Default data source: the prebuilt trie served from this package via jsDelivr's CDN. */
+export const DEFAULT_PSL_URL = `https://cdn.jsdelivr.net/npm/@structured-world/structured-public-domains@${PSL_RANGE}/dist/psl.bin`;
 
 const DEFAULT_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -37,6 +43,7 @@ const isNode = typeof process !== "undefined" && process.versions != null && pro
 
 let cachedBytes: Uint8Array | undefined;
 let cachedTrie: TrieNode | undefined;
+let inFlight: Promise<void> | undefined;
 
 /**
  * Fetch, cache, and parse the PSL trie. Idempotent: a second call is a no-op
@@ -53,26 +60,48 @@ let cachedTrie: TrieNode | undefined;
  */
 export async function load(opts: LoadOptions = {}): Promise<void> {
   if (cachedTrie !== undefined && opts.force !== true) return;
+  // Dedup overlapping startup calls: the first stores the pending promise,
+  // later callers await it instead of starting a second fetch/parse.
+  if (inFlight !== undefined && opts.force !== true) return inFlight;
+  inFlight = doLoad(opts).finally(() => {
+    inFlight = undefined;
+  });
+  return inFlight;
+}
 
+async function doLoad(opts: LoadOptions): Promise<void> {
   const url = opts.url ?? DEFAULT_PSL_URL;
   const ttlMs = opts.cacheTtlMs ?? DEFAULT_TTL_MS;
   const useCache = opts.cache ?? true;
   const doFetch = opts.fetch ?? globalThis.fetch;
 
   let data: Uint8Array | undefined;
+  let trie: TrieNode | undefined;
+
+  // Try the cache, but parse it here: a fresh-but-corrupt blob must not break
+  // load() permanently — discard it and fall through to the network instead.
   if (useCache && opts.force !== true) {
     data = await readCache(url, ttlMs, opts.cacheDir);
+    if (data !== undefined) {
+      try {
+        trie = parseTrie(data);
+      } catch {
+        data = undefined;
+        await deleteCache(url, opts.cacheDir).catch(() => undefined);
+      }
+    }
   }
-  if (data === undefined) {
+
+  if (trie === undefined) {
     if (typeof doFetch !== "function") {
       throw new Error("no fetch implementation available; pass `fetch` in LoadOptions");
     }
     data = await fetchBytes(doFetch, url);
+    // Parse before caching so a bad network body is never persisted.
+    trie = parseTrie(data);
     if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
   }
 
-  // Parse before committing so corrupt data throws instead of caching a bad trie.
-  const trie = parseTrie(data);
   cachedBytes = data;
   cachedTrie = trie;
 }
@@ -152,6 +181,17 @@ async function writeCache(url: string, data: Uint8Array, cacheDir?: string): Pro
   else await writeBrowserCache(url, data);
 }
 
+/** Remove a stale/corrupt cache entry so the next load() re-fetches cleanly. */
+async function deleteCache(url: string, cacheDir?: string): Promise<void> {
+  if (isNode) {
+    const { fs, file } = await nodeCache(url, cacheDir);
+    fs.rmSync(file, { force: true });
+  } else if (typeof caches !== "undefined") {
+    const cache = await caches.open("structured-public-domains");
+    await cache.delete(url);
+  }
+}
+
 // Import Node builtins through a variable specifier so bundlers cannot statically
 // resolve them (this code path only runs under Node) and esbuild does not rewrite
 // the `node:` prefix to a bare `fs`/`os`/`path` that browser bundlers choke on.
@@ -176,7 +216,11 @@ async function readNodeCache(url: string, ttlMs: number, cacheDir?: string): Pro
 async function writeNodeCache(url: string, data: Uint8Array, cacheDir?: string): Promise<void> {
   const { fs, dir, file } = await nodeCache(url, cacheDir);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(file, data);
+  // Write to a sibling temp file then rename, so a crash or concurrent writer
+  // never leaves a truncated psl.bin that would fail parseTrie on the next read.
+  const tmp = `${file}.${process.pid}.${Date.now()}.tmp`;
+  fs.writeFileSync(tmp, data);
+  fs.renameSync(tmp, file);
 }
 
 async function readBrowserCache(url: string, ttlMs: number): Promise<Uint8Array | undefined> {
