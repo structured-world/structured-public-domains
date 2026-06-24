@@ -35,18 +35,15 @@ assert!(is_known_suffix("example.com"));
 
 ## Usage (JavaScript / TypeScript)
 
-The same PSL trie is available as an npm package compiled to WebAssembly.
+The same PSL trie ships as a native TypeScript npm package — no WebAssembly, no
+runtime dependencies. The ~108KB binary trie is embedded and decoded lazily on
+first call, so every function is **synchronous** with no `init()`: it drops
+straight into Node, browsers, bundlers, and downstream libraries. Ships both
+ESM and CommonJS with type declarations for each.
 
 ```sh
 npm install @structured-world/structured-public-domains
 ```
-
-### Node.js / NestJS
-
-No `init()` call is needed — the wasm module is loaded during module
-initialization. Both ESM (`import`) and CommonJS (`require`) are supported: the
-CommonJS entry loads the wasm synchronously, while the ESM entry loads it during
-module evaluation (top-level await).
 
 ```typescript
 // ESM
@@ -66,14 +63,19 @@ isKnownSuffix('example.com');          // true
 const { lookup, registrableDomain, isKnownSuffix } = require('@structured-world/structured-public-domains');
 ```
 
-### Browser
+### Raw trie data
+
+The embedded binary trie is exposed for consumers that want to walk it
+themselves (the format matches the Rust crate's `src/psl.bin`):
 
 ```typescript
-import { init, lookup } from '@structured-world/structured-public-domains/browser';
+import { pslData } from '@structured-world/structured-public-domains';
 
-await init();   // fetch + compile wasm (once)
-const info = lookup('www.example.co.uk');
+const bytes = pslData();   // Uint8Array — a defensive copy of the trie blob
 ```
+
+The JS lookup is verified byte-for-byte against the Rust implementation over the
+entire PSL on every CI run, so both languages return identical results.
 
 ## Performance
 
