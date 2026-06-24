@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.7](https://github.com/structured-world/structured-public-domains/compare/v0.0.6...v0.0.7) - 2026-06-24
+
+### Added
+
+- *(npm)* [**breaking**] native TypeScript PSL package (drop wasm) + CI publish fixes ([#26](https://github.com/structured-world/structured-public-domains/pull/26))
+
 ## [0.0.6](https://github.com/structured-world/structured-public-domains/compare/v0.0.5...v0.0.6) - 2026-06-23
 
 ### Added
