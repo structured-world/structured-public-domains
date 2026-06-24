@@ -1,7 +1,7 @@
 // Tests for the runtime-fetched "tiny" entry. The PSL bytes are injected via a
 // mock fetch reading the real src/psl.bin, so results must match the embedded
 // build exactly. Module state is reset between tests via vitest module isolation.
-import { readFileSync, rmSync } from "node:fs";
+import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -108,6 +108,52 @@ describe("tiny cache (Node file)", () => {
     const fetch2 = mockFetch();
     await second.load({ fetch: fetch2, cacheDir: dir, force: true });
     expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("tiny load robustness", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = uniqueCacheDir();
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("deduplicates concurrent load() calls into a single fetch", async () => {
+    const tiny = await freshTiny();
+    let calls = 0;
+    const slowFetch = (async () => {
+      calls++;
+      await new Promise((r) => setTimeout(r, 20));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        arrayBuffer: async () =>
+          PSL_BIN.buffer.slice(PSL_BIN.byteOffset, PSL_BIN.byteOffset + PSL_BIN.byteLength),
+      };
+    }) as unknown as typeof fetch;
+
+    // Two overlapping startup calls must share one fetch, not race.
+    await Promise.all([tiny.load({ fetch: slowFetch, cache: false }), tiny.load({ fetch: slowFetch, cache: false })]);
+    expect(calls).toBe(1);
+    expect(tiny.lookup("example.com")?.suffix).toBe("com");
+  });
+
+  it("falls back to the network when the cached blob is corrupt", async () => {
+    // Seed a fresh-but-corrupt cache file.
+    const seed = await freshTiny();
+    const seedFetch = mockFetch();
+    await seed.load({ fetch: seedFetch, cacheDir: dir });
+    for (const f of readdirSync(dir)) writeFileSync(join(dir, f), Buffer.from("not a trie"));
+
+    // A new instance reading the corrupt cache must recover via fetch, not throw.
+    const tiny = await freshTiny();
+    const recoverFetch = mockFetch();
+    await expect(tiny.load({ fetch: recoverFetch, cacheDir: dir })).resolves.toBeUndefined();
+    expect(recoverFetch).toHaveBeenCalledTimes(1);
+    expect(tiny.lookup("example.com")?.suffix).toBe("com");
   });
 });
 
