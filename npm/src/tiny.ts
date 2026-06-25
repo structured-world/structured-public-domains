@@ -111,9 +111,14 @@ async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
     if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
   }
 
-  // Commit only if a newer load hasn't started since: a superseded older load
-  // (e.g. one a forced refresh overtook) must not clobber the latest result.
-  if (gen !== latestGen) return;
+  // A newer load superseded this one (e.g. a forced refresh overtook it): don't
+  // clobber the latest result with stale data. But don't resolve as "ready"
+  // while unloaded either — await the winning load so this caller observes a
+  // loaded singleton (or the winner's failure).
+  if (gen !== latestGen) {
+    if (inFlight !== undefined) await inFlight;
+    return;
+  }
   cachedBytes = data;
   cachedTrie = trie;
 }
