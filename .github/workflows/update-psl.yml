@@ -125,11 +125,26 @@ jobs:
         if: steps.diff.outputs.changed == 'true'
         run: cargo test --all-features
 
-      # No version bump here: this PR carries data only. Merging it lands a
-      # `feat(data)` commit on the default branch, which the release-automation
-      # workflow turns into / folds into its open release PR (version + changelog).
-      # The npm package version is derived from the crate version at publish time,
-      # so a single source of truth owns versioning and they never drift.
+      - name: Bump patch version
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          MAJOR=$(echo "$VER" | cut -d. -f1)
+          MINOR=$(echo "$VER" | cut -d. -f2)
+          PATCH=$(echo "$VER" | cut -d. -f3)
+          NEW="$MAJOR.$MINOR.$((PATCH + 1))"
+          sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
+          # Sync version to npm package
+          node -e "
+            const fs = require('fs');
+            const p = JSON.parse(fs.readFileSync('npm/package.json', 'utf8'));
+            p.version = '$NEW';
+            fs.writeFileSync('npm/package.json', JSON.stringify(p, null, 2) + '\n');
+          "
+
+      - name: Refresh Cargo.lock after version bump
+        if: steps.diff.outputs.changed == 'true'
+        run: cargo check --all-features
 
       - name: Read commit message
         if: steps.diff.outputs.changed == 'true'
