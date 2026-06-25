@@ -29,6 +29,27 @@ async function freshTiny() {
 
 const uniqueCacheDir = () => join(tmpdir(), `spd-tiny-test-${Math.random().toString(36).slice(2)}`);
 
+/**
+ * Build a valid binary trie (DFS preorder, same format as build-psl.py) in which
+ * "zzztest" is a public-suffix boundary. Padded past the 1KB fetch sanity check
+ * with filler TLD leaves. Used to distinguish two concurrently-loaded datasets.
+ */
+function buildAltTrie(): Uint8Array {
+  const enc = new TextEncoder();
+  const leaf = (boundary: boolean) => Uint8Array.from([boundary ? 1 : 0, 0, 0]);
+  // Sorted, distinct labels: filler "f000".."f249" then "zzztest" (a known TLD).
+  const children: [string, Uint8Array][] = [];
+  for (let i = 0; i < 250; i++) children.push([`f${String(i).padStart(3, "0")}`, leaf(false)]);
+  children.push(["zzztest", leaf(true)]);
+
+  const parts: number[] = [0, children.length & 0xff, (children.length >> 8) & 0xff];
+  for (const [label, child] of children) {
+    const lb = enc.encode(label);
+    parts.push(lb.length, ...lb, ...child);
+  }
+  return Uint8Array.from(parts);
+}
+
 describe("tiny load + lookup", () => {
   it("fetches, parses, and resolves lookups matching the embedded build", async () => {
     const tiny = await freshTiny();
@@ -139,6 +160,31 @@ describe("tiny load robustness", () => {
     await Promise.all([tiny.load({ fetch: slowFetch, cache: false }), tiny.load({ fetch: slowFetch, cache: false })]);
     expect(calls).toBe(1);
     expect(tiny.lookup("example.com")?.suffix).toBe("com");
+  });
+
+  it("does not let an older in-flight load overwrite a forced refresh", async () => {
+    const tiny = await freshTiny();
+    // `alt` is a valid trie where "zzztest" is a known suffix; the real PSL has
+    // no such rule. Whichever dataset wins is observable via isKnownSuffix.
+    const alt = buildAltTrie();
+    const delayed = (bytes: Uint8Array, ms: number) =>
+      (async () => {
+        await new Promise((r) => setTimeout(r, ms));
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+        };
+      }) as unknown as typeof fetch;
+
+    // A slow non-forced load is already pending when a fast forced refresh runs.
+    // The forced refresh (real PSL) must win even though the older load settles last.
+    await Promise.all([
+      tiny.load({ fetch: delayed(alt, 40), cache: false }),
+      tiny.load({ fetch: delayed(PSL_BIN, 5), cache: false, force: true }),
+    ]);
+    expect(tiny.isKnownSuffix("zzztest")).toBe(false);
   });
 
   it("falls back to the network when the cached blob is corrupt", async () => {
