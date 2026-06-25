@@ -187,6 +187,29 @@ describe("tiny load robustness", () => {
     expect(tiny.isKnownSuffix("zzztest")).toBe(false);
   });
 
+  it("does not resolve a superseded load until data is actually loaded", async () => {
+    const tiny = await freshTiny();
+    const delayed = (bytes: Uint8Array, ms: number) =>
+      (async () => {
+        await new Promise((r) => setTimeout(r, ms));
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+        };
+      }) as unknown as typeof fetch;
+
+    // The non-forced load finishes first but is superseded by the forced load.
+    // Awaiting it must not resolve as ready while the singleton is still unloaded.
+    const loadA = tiny.load({ fetch: delayed(PSL_BIN, 5), cache: false });
+    const loadB = tiny.load({ fetch: delayed(PSL_BIN, 40), cache: false, force: true });
+    await loadA;
+    expect(tiny.isLoaded()).toBe(true);
+    expect(tiny.lookup("example.com")?.suffix).toBe("com");
+    await loadB;
+  });
+
   it("recovers via a forced refresh when the initial load hangs", async () => {
     const tiny = await freshTiny();
     // A non-forced load whose fetch never settles (stuck CDN request).
