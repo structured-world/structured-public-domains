@@ -235,6 +235,43 @@ describe("tiny load robustness", () => {
     expect(tiny.isLoaded()).toBe(false);
   });
 
+  it("rejects a forced refresh superseded by a failing forced refresh, keeping the old data", async () => {
+    const tiny = await freshTiny();
+    const instant = (bytes: Uint8Array) =>
+      (async () => ({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+      })) as unknown as typeof fetch;
+    const slowFresh = (async () => {
+      await new Promise((r) => setTimeout(r, 40));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        arrayBuffer: async () => PSL_BIN.buffer.slice(PSL_BIN.byteOffset, PSL_BIN.byteOffset + PSL_BIN.byteLength),
+      };
+    }) as unknown as typeof fetch;
+    const failFast = (async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return { ok: false, status: 500, statusText: "Server Error" };
+    }) as unknown as typeof fetch;
+
+    // Singleton is already loaded with OLD data (alt trie: "zzztest" is known).
+    await tiny.load({ fetch: instant(buildAltTrie()), cache: false });
+    expect(tiny.isKnownSuffix("zzztest")).toBe(true);
+
+    // A slow forced refresh is superseded by a faster forced refresh that fails.
+    // The slow refresh must NOT report success while the module still serves the
+    // pre-refresh data — it mirrors the failing winner and rejects.
+    const loadX = tiny.load({ fetch: slowFresh, cache: false, force: true });
+    const loadY = tiny.load({ fetch: failFast, cache: false, force: true });
+    await expect(loadY).rejects.toThrow();
+    await expect(loadX).rejects.toThrow();
+    expect(tiny.isKnownSuffix("zzztest")).toBe(true);
+  });
+
   it("recovers via a forced refresh when the initial load hangs", async () => {
     const tiny = await freshTiny();
     // A non-forced load whose fetch never settles (stuck CDN request).
