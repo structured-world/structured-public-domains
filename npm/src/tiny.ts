@@ -44,6 +44,11 @@ const isNode = typeof process !== "undefined" && process.versions != null && pro
 let cachedBytes: Uint8Array | undefined;
 let cachedTrie: TrieNode | undefined;
 let inFlight: Promise<void> | undefined;
+// Monotonic load generation. Only the most recently STARTED load is allowed to
+// commit, so a forced refresh supersedes an older load without waiting for it
+// (a hung initial fetch can't block recovery), and a superseded/older load can
+// never overwrite the newer result when it finally settles.
+let latestGen = 0;
 
 /**
  * Fetch, cache, and parse the PSL trie. Idempotent: a second call is a no-op
@@ -60,27 +65,20 @@ let inFlight: Promise<void> | undefined;
  */
 export async function load(opts: LoadOptions = {}): Promise<void> {
   if (cachedTrie !== undefined && opts.force !== true) return;
-  // Dedup overlapping startup calls: the first stores the pending promise,
-  // later non-forced callers await it instead of starting a second fetch/parse.
-  if (inFlight !== undefined) {
-    if (opts.force !== true) return inFlight;
-    // A forced refresh must commit AFTER any in-flight load, so the older load
-    // cannot overwrite the fresh data. Wait it out (ignoring its failure).
-    try {
-      await inFlight;
-    } catch {
-      // The overlapping load failed; the forced refresh proceeds regardless.
-    }
-  }
-  // Guard the reset so a superseding load doesn't clear a newer in-flight entry.
-  const pending = doLoad(opts).finally(() => {
+  // Non-forced callers dedup onto the in-flight load (one fetch for concurrent
+  // startups). A forced refresh starts its own load instead of waiting, so a
+  // stuck initial request can't block recovery via a healthy mirror.
+  if (inFlight !== undefined && opts.force !== true) return inFlight;
+
+  const gen = ++latestGen;
+  const pending = doLoad(opts, gen).finally(() => {
     if (inFlight === pending) inFlight = undefined;
   });
   inFlight = pending;
   return pending;
 }
 
-async function doLoad(opts: LoadOptions): Promise<void> {
+async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
   const url = opts.url ?? DEFAULT_PSL_URL;
   const ttlMs = opts.cacheTtlMs ?? DEFAULT_TTL_MS;
   const useCache = opts.cache ?? true;
@@ -113,6 +111,9 @@ async function doLoad(opts: LoadOptions): Promise<void> {
     if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
   }
 
+  // Commit only if a newer load hasn't started since: a superseded older load
+  // (e.g. one a forced refresh overtook) must not clobber the latest result.
+  if (gen !== latestGen) return;
   cachedBytes = data;
   cachedTrie = trie;
 }
