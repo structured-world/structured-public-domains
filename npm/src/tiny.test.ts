@@ -210,6 +210,31 @@ describe("tiny load robustness", () => {
     await loadB;
   });
 
+  it("rejects a superseded load when the winning forced load fails", async () => {
+    const tiny = await freshTiny();
+    const slowOk = (async () => {
+      await new Promise((r) => setTimeout(r, 40));
+      return {
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        arrayBuffer: async () => PSL_BIN.buffer.slice(PSL_BIN.byteOffset, PSL_BIN.byteOffset + PSL_BIN.byteLength),
+      };
+    }) as unknown as typeof fetch;
+    const failFast = (async () => {
+      await new Promise((r) => setTimeout(r, 5));
+      return { ok: false, status: 500, statusText: "Server Error" };
+    }) as unknown as typeof fetch;
+
+    // The forced load fails fast and clears the in-flight state; the older load
+    // (superseded) must not then resolve as ready while nothing is loaded.
+    const loadA = tiny.load({ fetch: slowOk, cache: false });
+    const loadB = tiny.load({ fetch: failFast, cache: false, force: true });
+    await expect(loadB).rejects.toThrow();
+    await expect(loadA).rejects.toThrow();
+    expect(tiny.isLoaded()).toBe(false);
+  });
+
   it("recovers via a forced refresh when the initial load hangs", async () => {
     const tiny = await freshTiny();
     // A non-forced load whose fetch never settles (stuck CDN request).
