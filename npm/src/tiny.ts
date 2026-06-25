@@ -44,11 +44,12 @@ const isNode = typeof process !== "undefined" && process.versions != null && pro
 let cachedBytes: Uint8Array | undefined;
 let cachedTrie: TrieNode | undefined;
 let inFlight: Promise<void> | undefined;
-// Monotonic load generation. Only the most recently STARTED load is allowed to
-// commit, so a forced refresh supersedes an older load without waiting for it
-// (a hung initial fetch can't block recovery), and a superseded/older load can
-// never overwrite the newer result when it finally settles.
+// Monotonic load generation + the promise of the most recently STARTED load.
+// Only the latest generation commits; any superseded load mirrors the latest
+// load's outcome (resolves iff it committed, rejects on its failure) instead of
+// committing stale data, hanging behind it, or reporting a false success.
 let latestGen = 0;
+let latestSettled: Promise<void> | undefined;
 
 /**
  * Fetch, cache, and parse the PSL trie. Idempotent: a second call is a no-op
@@ -63,68 +64,78 @@ let latestGen = 0;
  * registrableDomain('sub.example.co.uk'); // "example.co.uk"
  * ```
  */
-export async function load(opts: LoadOptions = {}): Promise<void> {
-  if (cachedTrie !== undefined && opts.force !== true) return;
+export function load(opts: LoadOptions = {}): Promise<void> {
+  if (cachedTrie !== undefined && opts.force !== true) return Promise.resolve();
   // Non-forced callers dedup onto the in-flight load (one fetch for concurrent
   // startups). A forced refresh starts its own load instead of waiting, so a
   // stuck initial request can't block recovery via a healthy mirror.
   if (inFlight !== undefined && opts.force !== true) return inFlight;
 
   const gen = ++latestGen;
-  const pending = doLoad(opts, gen).finally(() => {
-    if (inFlight === pending) inFlight = undefined;
-  });
+  const pending = doLoad(opts, gen);
+  latestSettled = pending;
   inFlight = pending;
+  // Clear the in-flight slot once this load settles. The `.catch` keeps this
+  // bookkeeping copy from surfacing as an unhandled rejection — the real
+  // rejection is still delivered to the `pending` returned to the caller.
+  pending
+    .finally(() => {
+      if (inFlight === pending) inFlight = undefined;
+    })
+    .catch(() => undefined);
   return pending;
 }
 
+// Await the authoritative (latest) load's outcome — used by a superseded load to
+// mirror it. Never called for the latest load itself, so it can't await itself.
+function mirrorLatest(): Promise<void> {
+  return latestSettled ?? Promise.resolve();
+}
+
 async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
+  let data: Uint8Array;
+  let trie: TrieNode;
+  try {
+    [data, trie] = await fetchAndParse(opts);
+  } catch (err) {
+    // Authoritative failure propagates; a superseded load mirrors the latest.
+    if (gen !== latestGen) return mirrorLatest();
+    throw err;
+  }
+  // A newer load superseded this one: don't commit stale data — mirror the
+  // latest load's outcome (it may still be loading, have committed, or failed).
+  if (gen !== latestGen) return mirrorLatest();
+  cachedBytes = data;
+  cachedTrie = trie;
+}
+
+async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]> {
   const url = opts.url ?? DEFAULT_PSL_URL;
   const ttlMs = opts.cacheTtlMs ?? DEFAULT_TTL_MS;
   const useCache = opts.cache ?? true;
   const doFetch = opts.fetch ?? globalThis.fetch;
 
-  let data: Uint8Array | undefined;
-  let trie: TrieNode | undefined;
-
   // Try the cache, but parse it here: a fresh-but-corrupt blob must not break
   // load() permanently — discard it and fall through to the network instead.
   if (useCache && opts.force !== true) {
-    data = await readCache(url, ttlMs, opts.cacheDir);
-    if (data !== undefined) {
+    const cached = await readCache(url, ttlMs, opts.cacheDir);
+    if (cached !== undefined) {
       try {
-        trie = parseTrie(data);
+        return [cached, parseTrie(cached)];
       } catch {
-        data = undefined;
         await deleteCache(url, opts.cacheDir).catch(() => undefined);
       }
     }
   }
 
-  if (trie === undefined) {
-    if (typeof doFetch !== "function") {
-      throw new Error("no fetch implementation available; pass `fetch` in LoadOptions");
-    }
-    data = await fetchBytes(doFetch, url);
-    // Parse before caching so a bad network body is never persisted.
-    trie = parseTrie(data);
-    if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
+  if (typeof doFetch !== "function") {
+    throw new Error("no fetch implementation available; pass `fetch` in LoadOptions");
   }
-
-  // A newer load superseded this one (e.g. a forced refresh overtook it): don't
-  // clobber the latest result with stale data. Mirror the authoritative load's
-  // outcome — wait for whatever is in flight, then resolve only if something
-  // actually got loaded; otherwise the winning load failed, so reject too
-  // (never resolve as "ready" while the singleton is still unloaded).
-  if (gen !== latestGen) {
-    if (inFlight !== undefined) await inFlight.catch(() => undefined);
-    if (cachedTrie === undefined) {
-      throw new Error("PSL load was superseded by a load that did not complete");
-    }
-    return;
-  }
-  cachedBytes = data;
-  cachedTrie = trie;
+  const data = await fetchBytes(doFetch, url);
+  // Parse before caching so a bad network body is never persisted.
+  const trie = parseTrie(data);
+  if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
+  return [data, trie];
 }
 
 /** Whether {@link load} has completed and the lookup API is ready. */
