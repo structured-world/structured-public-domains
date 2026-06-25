@@ -187,6 +187,23 @@ describe("tiny load robustness", () => {
     expect(tiny.isKnownSuffix("zzztest")).toBe(false);
   });
 
+  it("recovers via a forced refresh when the initial load hangs", async () => {
+    const tiny = await freshTiny();
+    // A non-forced load whose fetch never settles (stuck CDN request).
+    const hang = (() => new Promise<never>(() => {})) as unknown as typeof fetch;
+    void tiny.load({ fetch: hang, cache: false });
+
+    // A forced refresh against a healthy mirror must not wait on the stuck load.
+    const healthy = mockFetch();
+    const result = await Promise.race([
+      tiny.load({ fetch: healthy, cache: false, force: true }).then(() => "DONE"),
+      new Promise((r) => setTimeout(() => r("TIMEOUT"), 300)),
+    ]);
+    expect(result).toBe("DONE");
+    expect(healthy).toHaveBeenCalledTimes(1);
+    expect(tiny.lookup("example.com")?.suffix).toBe("com");
+  });
+
   it("falls back to the network when the cached blob is corrupt", async () => {
     // Seed a fresh-but-corrupt cache file.
     const seed = await freshTiny();
