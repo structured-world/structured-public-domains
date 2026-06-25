@@ -1,7 +1,14 @@
 name: Update PSL Data
 
-# Static group: this workflow always targets the single chore/psl-update branch.
-# No cancel-in-progress — a run that already committed must not be killed mid-push.
+# Daily PSL data refresh, released INDEPENDENTLY of code changes.
+#
+# A data release is cut from the LAST RELEASE TAG, not from main's HEAD, so it
+# can never sweep in unreleased code sitting on main. The data commit is then
+# synced onto main; release-plz re-computes the pending code release to stack on
+# top of the new data release. So data and code stay on separate version steps
+# (e.g. 0.0.8 = data only, 0.0.9 = the code that was pending).
+#
+# No cancel-in-progress — a run that already tagged/pushed must not be killed.
 concurrency:
   group: update-psl
 
@@ -9,6 +16,9 @@ on:
   schedule:
     - cron: '0 6 * * *'  # Daily at 06:00 UTC
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   update:
@@ -24,16 +34,30 @@ jobs:
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app-token.outputs.token }}
+          fetch-depth: 0  # full history + tags needed to branch off the last release
 
       - name: Download fresh PSL
         run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o /tmp/psl-fresh.dat
 
+      - name: Resolve last release tag
+        id: base
+        run: |
+          # Highest semver tag (vX.Y.Z) is the baseline a data release is cut from.
+          TAG=$(git tag --list 'v*' --sort=-version:refname | head -1)
+          if [ -z "$TAG" ]; then
+            echo "No release tag found; cannot cut a data release." >&2
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Baseline tag: $TAG"
+
       - name: Check for rule changes
         id: diff
         run: |
-          # Extract and canonicalize rules identically to build-psl.py:
-          # strip comments/blanks, drop leading dot, lowercase — so case-only
-          # or dot-only upstream edits don't trigger false version bumps.
+          # Extract and canonicalize rules identically to build-psl.py: strip
+          # comments/blanks, drop leading dot, lowercase — so case-only or
+          # dot-only upstream edits don't trigger false version bumps. The
+          # baseline is the data file AT THE LAST RELEASE TAG.
           extract_rules() {
             python3 - "$1" <<'PY' | LC_ALL=C sort -u
           import sys
@@ -47,129 +71,156 @@ jobs:
           PY
           }
 
-          extract_rules data/public_suffix_list.dat > /tmp/rules-current.txt
+          git show "${{ steps.base.outputs.tag }}:data/public_suffix_list.dat" > /tmp/psl-base.dat
+          extract_rules /tmp/psl-base.dat > /tmp/rules-current.txt
           extract_rules /tmp/psl-fresh.dat > /tmp/rules-fresh.txt
 
           if diff -q /tmp/rules-current.txt /tmp/rules-fresh.txt > /dev/null 2>&1; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No rule changes detected"
-          else
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-
-            # Compute added/removed domains (LC_ALL=C matches sort collation)
-            LC_ALL=C comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
-            LC_ALL=C comm -23 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/removed.txt
-
-            ADDED=$(wc -l < /tmp/added.txt | tr -d ' ')
-            REMOVED=$(wc -l < /tmp/removed.txt | tr -d ' ')
-            echo "added=$ADDED" >> "$GITHUB_OUTPUT"
-            echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
-            echo "Domain changes: +$ADDED -$REMOVED"
-
-            # Build PR body
-            {
-              echo "Automated daily PSL data refresh."
-              echo "Source: https://publicsuffix.org/list/public_suffix_list.dat"
-              echo ""
-              echo "## Domain changes: +${ADDED} -${REMOVED}"
-              echo ""
-              if [ "$ADDED" -gt 0 ]; then
-                echo "### Added (${ADDED})"
-                echo '```'
-                head -200 /tmp/added.txt
-                if [ "$ADDED" -gt 200 ]; then echo "... and $((ADDED - 200)) more"; fi
-                echo '```'
-                echo ""
-              fi
-              if [ "$REMOVED" -gt 0 ]; then
-                echo "### Removed (${REMOVED})"
-                echo '```'
-                head -200 /tmp/removed.txt
-                if [ "$REMOVED" -gt 200 ]; then echo "... and $((REMOVED - 200)) more"; fi
-                echo '```'
-              fi
-            } > /tmp/pr-body.md
-
-            # Build commit message
-            {
-              echo "feat(data): update PSL (+${ADDED} -${REMOVED})"
-              echo ""
-              if [ "$ADDED" -gt 0 ]; then
-                echo "Added (${ADDED}):"
-                head -50 /tmp/added.txt | sed 's/^/  + /'
-                if [ "$ADDED" -gt 50 ]; then echo "  ... and $((ADDED - 50)) more"; fi
-                echo ""
-              fi
-              if [ "$REMOVED" -gt 0 ]; then
-                echo "Removed (${REMOVED}):"
-                head -50 /tmp/removed.txt | sed 's/^/  - /'
-                if [ "$REMOVED" -gt 50 ]; then echo "  ... and $((REMOVED - 50)) more"; fi
-              fi
-            } > /tmp/commit-msg.txt
+            echo "No rule changes since ${{ steps.base.outputs.tag }}"
+            exit 0
           fi
+          echo "changed=true" >> "$GITHUB_OUTPUT"
 
-      - name: Update data file
-        if: steps.diff.outputs.changed == 'true'
-        run: cp /tmp/psl-fresh.dat data/public_suffix_list.dat
+          # Compute added/removed domains (LC_ALL=C matches sort collation).
+          LC_ALL=C comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
+          LC_ALL=C comm -23 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/removed.txt
+          ADDED=$(wc -l < /tmp/added.txt | tr -d ' ')
+          REMOVED=$(wc -l < /tmp/removed.txt | tr -d ' ')
+          echo "added=$ADDED" >> "$GITHUB_OUTPUT"
+          echo "removed=$REMOVED" >> "$GITHUB_OUTPUT"
+          echo "Domain changes: +$ADDED -$REMOVED"
+
+          # Release notes / changelog body: the explicit list of added/removed
+          # domains (capped, with an overflow note) — consumers must be able to
+          # see exactly which domains changed.
+          {
+            echo "Automated PSL data refresh from https://publicsuffix.org/list/public_suffix_list.dat"
+            echo ""
+            echo "Domain changes: +${ADDED} -${REMOVED}"
+            if [ "$ADDED" -gt 0 ]; then
+              echo ""
+              echo "Added (${ADDED}):"
+              head -100 /tmp/added.txt | sed 's/^/  + /'
+              if [ "$ADDED" -gt 100 ]; then echo "  ... and $((ADDED - 100)) more"; fi
+            fi
+            if [ "$REMOVED" -gt 0 ]; then
+              echo ""
+              echo "Removed (${REMOVED}):"
+              head -100 /tmp/removed.txt | sed 's/^/  - /'
+              if [ "$REMOVED" -gt 100 ]; then echo "  ... and $((REMOVED - 100)) more"; fi
+            fi
+          } > /tmp/domains.txt
 
       - uses: dtolnay/rust-toolchain@stable
         if: steps.diff.outputs.changed == 'true'
       - uses: Swatinem/rust-cache@v2
         if: steps.diff.outputs.changed == 'true'
 
-      - name: Build binary trie
+      - name: Cut data release off the last tag
         if: steps.diff.outputs.changed == 'true'
-        run: python3 scripts/build-psl.py
-
-      - name: Run tests
-        if: steps.diff.outputs.changed == 'true'
-        run: cargo test --all-features
-
-      - name: Bump patch version
-        if: steps.diff.outputs.changed == 'true'
-        run: |
-          VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          MAJOR=$(echo "$VER" | cut -d. -f1)
-          MINOR=$(echo "$VER" | cut -d. -f2)
-          PATCH=$(echo "$VER" | cut -d. -f3)
-          NEW="$MAJOR.$MINOR.$((PATCH + 1))"
-          sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
-          # Sync version to npm package
-          node -e "
-            const fs = require('fs');
-            const p = JSON.parse(fs.readFileSync('npm/package.json', 'utf8'));
-            p.version = '$NEW';
-            fs.writeFileSync('npm/package.json', JSON.stringify(p, null, 2) + '\n');
-          "
-
-      - name: Refresh Cargo.lock after version bump
-        if: steps.diff.outputs.changed == 'true'
-        run: cargo check --all-features
-
-      - name: Read commit message
-        if: steps.diff.outputs.changed == 'true'
-        id: commit-msg
-        run: |
-          {
-            echo "message<<COMMIT_EOF"
-            cat /tmp/commit-msg.txt
-            echo "COMMIT_EOF"
-          } >> "$GITHUB_OUTPUT"
-
-      - name: Create PR
-        if: steps.diff.outputs.changed == 'true'
-        id: pr
-        uses: peter-evans/create-pull-request@v8
-        with:
-          token: ${{ steps.app-token.outputs.token }}
-          title: "feat(data): update PSL (+${{ steps.diff.outputs.added }} -${{ steps.diff.outputs.removed }})"
-          body-path: /tmp/pr-body.md
-          branch: chore/psl-update
-          commit-message: ${{ steps.commit-msg.outputs.message }}
-          delete-branch: true
-
-      - name: Enable auto-merge
-        if: steps.pr.outputs.pull-request-number
-        run: gh pr merge --auto --squash "${{ steps.pr.outputs.pull-request-number }}"
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_TAG: ${{ steps.base.outputs.tag }}
+          ADDED: ${{ steps.diff.outputs.added }}
+          REMOVED: ${{ steps.diff.outputs.removed }}
+        run: |
+          set -euo pipefail
+          git config user.name "sw-release-bot[bot]"
+          git config user.email "sw-release-bot[bot]@users.noreply.github.com"
+
+          # Branch from the LAST RELEASE so the data release carries no
+          # unreleased code that may be sitting on main.
+          git checkout -B chore/psl-update "$BASE_TAG"
+
+          cp /tmp/psl-fresh.dat data/public_suffix_list.dat
+          python3 scripts/build-psl.py
+          cargo test --all-features
+
+          # Patch-bump from the baseline version (Cargo is the source of truth;
+          # npm mirrors it).
+          VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          NEW="$(echo "$VER" | cut -d. -f1).$(echo "$VER" | cut -d. -f2).$(( $(echo "$VER" | cut -d. -f3) + 1 ))"
+          sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('npm/package.json','utf8'));p.version='$NEW';fs.writeFileSync('npm/package.json',JSON.stringify(p,null,2)+'\n')"
+          cargo check --all-features  # refresh Cargo.lock
+
+          # Prepend a CHANGELOG entry listing the domain diff.
+          TODAY=$(date -u +%Y-%m-%d)
+          {
+            echo "## [${NEW}](https://github.com/${GITHUB_REPOSITORY}/compare/${BASE_TAG}...v${NEW}) - ${TODAY}"
+            echo ""
+            echo "### Data"
+            echo ""
+            echo "PSL data update: +${ADDED} -${REMOVED} domains."
+            echo ""
+            if [ "$ADDED" -gt 0 ]; then
+              echo "<details><summary>Added (${ADDED})</summary>"
+              echo ""
+              echo '```'
+              head -100 /tmp/added.txt
+              if [ "$ADDED" -gt 100 ]; then echo "... and $((ADDED - 100)) more"; fi
+              echo '```'
+              echo ""
+              echo "</details>"
+              echo ""
+            fi
+            if [ "$REMOVED" -gt 0 ]; then
+              echo "<details><summary>Removed (${REMOVED})</summary>"
+              echo ""
+              echo '```'
+              head -100 /tmp/removed.txt
+              if [ "$REMOVED" -gt 100 ]; then echo "... and $((REMOVED - 100)) more"; fi
+              echo '```'
+              echo ""
+              echo "</details>"
+              echo ""
+            fi
+          } > /tmp/changelog-entry.md
+          # Insert the entry right after the "## [Unreleased]" marker.
+          python3 - "$NEW" <<'PY'
+          import sys, pathlib
+          new = sys.argv[1]
+          cl = pathlib.Path("CHANGELOG.md")
+          text = cl.read_text(encoding="utf-8")
+          entry = pathlib.Path("/tmp/changelog-entry.md").read_text(encoding="utf-8")
+          marker = "## [Unreleased]"
+          idx = text.find(marker)
+          if idx == -1:
+              cl.write_text(entry + "\n" + text, encoding="utf-8")
+          else:
+              end = text.find("\n", idx) + 1
+              cl.write_text(text[:end] + "\n" + entry + text[end:], encoding="utf-8")
+          PY
+
+          git add -A
+          {
+            echo "feat(data): update PSL (+${ADDED} -${REMOVED})"
+            echo ""
+            cat /tmp/domains.txt
+          } > /tmp/commit-msg.txt
+          git commit -F /tmp/commit-msg.txt
+
+          # Push the branch + tag, then create the GitHub release whose notes are
+          # the domain diff. The release event triggers publishing.
+          git push -u origin chore/psl-update
+          git tag "v${NEW}"
+          git push origin "v${NEW}"
+          gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
+
+          echo "new_version=$NEW" >> "$GITHUB_ENV"
+
+      - name: Sync the data release onto main
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          # Bring the released data commit onto main via a MERGE commit (not squash
+          # or cherry-pick): the merge keeps the tagged commit as an ancestor of
+          # main, so release-plz recognises the data version as released and the
+          # next code release's changelog lists only the code — not the data again.
+          gh pr create --base main --head chore/psl-update \
+            --title "feat(data): update PSL (+${{ steps.diff.outputs.added }} -${{ steps.diff.outputs.removed }})" \
+            --body "Sync of released data v${{ env.new_version }} onto main."
+          gh pr merge --auto --merge chore/psl-update
