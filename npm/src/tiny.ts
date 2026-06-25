@@ -61,12 +61,23 @@ let inFlight: Promise<void> | undefined;
 export async function load(opts: LoadOptions = {}): Promise<void> {
   if (cachedTrie !== undefined && opts.force !== true) return;
   // Dedup overlapping startup calls: the first stores the pending promise,
-  // later callers await it instead of starting a second fetch/parse.
-  if (inFlight !== undefined && opts.force !== true) return inFlight;
-  inFlight = doLoad(opts).finally(() => {
-    inFlight = undefined;
+  // later non-forced callers await it instead of starting a second fetch/parse.
+  if (inFlight !== undefined) {
+    if (opts.force !== true) return inFlight;
+    // A forced refresh must commit AFTER any in-flight load, so the older load
+    // cannot overwrite the fresh data. Wait it out (ignoring its failure).
+    try {
+      await inFlight;
+    } catch {
+      // The overlapping load failed; the forced refresh proceeds regardless.
+    }
+  }
+  // Guard the reset so a superseding load doesn't clear a newer in-flight entry.
+  const pending = doLoad(opts).finally(() => {
+    if (inFlight === pending) inFlight = undefined;
   });
-  return inFlight;
+  inFlight = pending;
+  return pending;
 }
 
 async function doLoad(opts: LoadOptions): Promise<void> {
