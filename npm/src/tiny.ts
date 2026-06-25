@@ -112,11 +112,15 @@ async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
   }
 
   // A newer load superseded this one (e.g. a forced refresh overtook it): don't
-  // clobber the latest result with stale data. But don't resolve as "ready"
-  // while unloaded either — await the winning load so this caller observes a
-  // loaded singleton (or the winner's failure).
+  // clobber the latest result with stale data. Mirror the authoritative load's
+  // outcome — wait for whatever is in flight, then resolve only if something
+  // actually got loaded; otherwise the winning load failed, so reject too
+  // (never resolve as "ready" while the singleton is still unloaded).
   if (gen !== latestGen) {
-    if (inFlight !== undefined) await inFlight;
+    if (inFlight !== undefined) await inFlight.catch(() => undefined);
+    if (cachedTrie === undefined) {
+      throw new Error("PSL load was superseded by a load that did not complete");
+    }
     return;
   }
   cachedBytes = data;
