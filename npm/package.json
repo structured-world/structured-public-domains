@@ -31,7 +31,18 @@
         "types": "./dist/index.d.cts",
         "default": "./dist/index.cjs"
       }
-    }
+    },
+    "./tiny": {
+      "import": {
+        "types": "./dist/tiny.d.ts",
+        "default": "./dist/tiny.js"
+      },
+      "require": {
+        "types": "./dist/tiny.d.cts",
+        "default": "./dist/tiny.cjs"
+      }
+    },
+    "./psl.bin": "./dist/psl.bin"
   },
   "sideEffects": false,
   "files": [
@@ -46,7 +57,7 @@
   },
   "scripts": {
     "gen:data": "node scripts/gen-data.mjs",
-    "build": "npm run gen:data && tsup && node -e \"const fs=require('fs');fs.copyFileSync('src/psl-data.cjs','dist/psl-data.cjs');fs.copyFileSync('../README.md','README.md')\"",
+    "build": "npm run gen:data && tsup && node -e \"const fs=require('fs');fs.copyFileSync('src/psl-data.cjs','dist/psl-data.cjs');fs.copyFileSync('../src/psl.bin','dist/psl.bin');fs.copyFileSync('../README.md','README.md')\"",
     "test": "npm run gen:data && vitest run",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "npm run build"

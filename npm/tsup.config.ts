@@ -1,17 +1,33 @@
 import { defineConfig } from "tsup";
 
+import pkg from "./package.json";
+
+// Pin the tiny entry's default CDN URL to this package's major.minor range, so
+// it tracks PSL-data patch releases (which keep the trie format) but never
+// fetches a future format-breaking release the shipped parser can't read.
+const [major, minor] = pkg.version.split(".");
+const pslRange = `${major}.${minor}`;
+
 // Dual ESM + CJS build with type declarations for both. The base64 data module
 // (./psl-data.cjs) is forced external so it is NOT inlined into each bundle —
 // a single shared copy ships in dist and is loaded by both entries.
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: ["src/index.ts", "src/tiny.ts"],
   format: ["esm", "cjs"],
   dts: true,
   clean: true,
   outDir: "dist",
   target: "es2021",
+  define: { __PSL_PKG_RANGE__: JSON.stringify(pslRange) },
+  // "neutral" keeps output runtime-agnostic and preserves `node:` import
+  // specifiers (so browser bundlers recognise them as builtins to ignore,
+  // rather than esbuild rewriting them to bare `fs`/`os`/`path`).
+  platform: "neutral",
   sourcemap: false,
   treeshake: true,
+  // Keep Node builtins external: the tiny entry imports them dynamically and
+  // only on Node, so they must not be bundled (and would break browser output).
+  external: [/^node:/],
   esbuildPlugins: [
     {
       name: "external-psl-data",
