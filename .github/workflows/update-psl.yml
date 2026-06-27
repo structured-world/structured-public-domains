@@ -244,7 +244,27 @@ jobs:
         env:
           GH_TOKEN: ${{ steps.downstream-token.outputs.token }}
         run: |
+          set -euo pipefail
+          # The data release publishes asynchronously (release.yml, on the GitHub
+          # release created above). The downstream bumps its dependency on the
+          # PUBLISHED crate — not on this repo's main — so wait until the new
+          # version is live on crates.io before dispatching, so the downstream can
+          # bump immediately. (The sync-merge onto main is irrelevant downstream.)
+          ver="${{ env.new_version }}"
+          for i in $(seq 1 30); do
+            if curl -fsS "https://index.crates.io/st/ru/structured-public-domains" \
+                 | grep -q "\"vers\":\"${ver}\""; then
+              echo "structured-public-domains v${ver} is live on crates.io"
+              break
+            fi
+            if [ "$i" -eq 30 ]; then
+              echo "timed out waiting for v${ver} on crates.io" >&2
+              exit 1
+            fi
+            echo "waiting for v${ver} on crates.io (attempt ${i})..."
+            sleep 10
+          done
           gh api "repos/${{ github.repository_owner }}/structured-email-address/dispatches" \
             -f event_type=psl-updated \
-            -F "client_payload[version]=${{ env.new_version }}" \
-            -F "client_payload[crate]=${{ github.event.repository.name }}"
+            -F "client_payload[version]=${ver}" \
+            -F "client_payload[crate]=structured-public-domains"
