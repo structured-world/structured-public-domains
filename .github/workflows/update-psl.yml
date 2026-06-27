@@ -259,12 +259,17 @@ jobs:
           BASE_TAG: ${{ steps.base.outputs.tag }}
         run: |
           set -euo pipefail
-          # A prior run tagged + published this release but failed before the main
-          # sync, leaving the tag off main and breaking release-plz stacking. Open
-          # the sync PR for the existing tag (no new release). If the original run
-          # also failed before notifying downstream, dispatch it manually.
+          # A prior run tagged this release but failed before the main sync,
+          # leaving the tag off main and breaking release-plz stacking. Open the
+          # sync PR for the existing tag. If the prior run also failed at
+          # `gh release create`, the release object (and crates.io publish) is
+          # missing — recreate it so the tag actually publishes. If it failed
+          # before notifying downstream, dispatch that manually.
           BRANCH="chore/psl-resync-${BASE_TAG}"
           git push origin --force "${BASE_TAG}:refs/heads/${BRANCH}"
+          gh release view "$BASE_TAG" >/dev/null 2>&1 || \
+            gh release create "$BASE_TAG" --title "$BASE_TAG" \
+              --notes "PSL data release ${BASE_TAG} (resynced)."
           gh pr create --base main --head "$BRANCH" \
             --title "chore(data): sync released ${BASE_TAG} onto main" \
             --body "Re-sync of released data ${BASE_TAG} that did not reach main in a prior run." \
