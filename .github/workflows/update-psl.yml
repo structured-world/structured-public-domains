@@ -77,10 +77,21 @@ jobs:
 
           if diff -q /tmp/rules-current.txt /tmp/rules-fresh.txt > /dev/null 2>&1; then
             echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No rule changes since ${{ steps.base.outputs.tag }}"
+            # No new PSL changes since the baseline tag. But if a prior run cut
+            # the release tag yet failed before syncing it onto main, the tag is
+            # stranded — finish that sync instead of silently no-oping.
+            git fetch origin main --quiet
+            if git merge-base --is-ancestor "${{ steps.base.outputs.tag }}" origin/main; then
+              echo "resync=false" >> "$GITHUB_OUTPUT"
+              echo "No rule changes since ${{ steps.base.outputs.tag }}; already on main."
+            else
+              echo "resync=true" >> "$GITHUB_OUTPUT"
+              echo "No rule changes, but ${{ steps.base.outputs.tag }} is not on main — will resync."
+            fi
             exit 0
           fi
           echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "resync=false" >> "$GITHUB_OUTPUT"
 
           # Compute added/removed domains (LC_ALL=C matches sort collation).
           LC_ALL=C comm -13 /tmp/rules-current.txt /tmp/rules-fresh.txt > /tmp/added.txt
@@ -114,6 +125,8 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         if: steps.diff.outputs.changed == 'true'
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
         if: steps.diff.outputs.changed == 'true'
 
@@ -129,18 +142,28 @@ jobs:
           git config user.name "sw-release-bot[bot]"
           git config user.email "sw-release-bot[bot]@users.noreply.github.com"
 
+          # Patch-bump from the baseline version (Cargo is the source of truth;
+          # npm mirrors it). Read the baseline version straight from the tag so
+          # the release branch can be named per-version before checkout.
+          VER=$(git show "$BASE_TAG:Cargo.toml" | grep '^version' | head -1 | sed 's/.*"\(.*\)"/\1/')
+          NEW="$(echo "$VER" | cut -d. -f1).$(echo "$VER" | cut -d. -f2).$(( $(echo "$VER" | cut -d. -f3) + 1 ))"
+
+          # Version-specific branch: a fixed name collides with the previous
+          # cascade's remote branch and is rejected as non-fast-forward on reruns.
+          BRANCH="chore/psl-update-v${NEW}"
+
           # Branch from the LAST RELEASE so the data release carries no
           # unreleased code that may be sitting on main.
-          git checkout -B chore/psl-update "$BASE_TAG"
+          git checkout -B "$BRANCH" "$BASE_TAG"
 
           cp /tmp/psl-fresh.dat data/public_suffix_list.dat
           python3 scripts/build-psl.py
-          cargo test --all-features
 
-          # Patch-bump from the baseline version (Cargo is the source of truth;
-          # npm mirrors it).
-          VER=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
-          NEW="$(echo "$VER" | cut -d. -f1).$(echo "$VER" | cut -d. -f2).$(( $(echo "$VER" | cut -d. -f3) + 1 ))"
+          # Run the same gate CI enforces before publishing: a data bump must not
+          # ship unless clippy passes too, not just the test suite.
+          cargo test --all-features
+          cargo clippy --all-features -- -D warnings
+
           sed -i "s/^version = \"$VER\"/version = \"$NEW\"/" Cargo.toml
           node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('npm/package.json','utf8'));p.version='$NEW';fs.writeFileSync('npm/package.json',JSON.stringify(p,null,2)+'\n')"
           cargo check --all-features  # refresh Cargo.lock
@@ -203,7 +226,7 @@ jobs:
 
           # Push the branch + tag, then create the GitHub release whose notes are
           # the domain diff. The release event triggers publishing.
-          git push -u origin chore/psl-update
+          git push -u origin "$BRANCH"
           git tag "v${NEW}"
           git push origin "v${NEW}"
           gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
@@ -220,10 +243,30 @@ jobs:
           # or cherry-pick): the merge keeps the tagged commit as an ancestor of
           # main, so release-plz recognises the data version as released and the
           # next code release's changelog lists only the code — not the data again.
-          gh pr create --base main --head chore/psl-update \
+          BRANCH="chore/psl-update-v${{ env.new_version }}"
+          gh pr create --base main --head "$BRANCH" \
             --title "feat(data): update PSL (+${{ steps.diff.outputs.added }} -${{ steps.diff.outputs.removed }})" \
             --body "Sync of released data v${{ env.new_version }} onto main."
-          gh pr merge --auto --merge chore/psl-update
+          gh pr merge --auto --merge "$BRANCH"
+
+      - name: Resync stranded release tag onto main
+        if: steps.diff.outputs.resync == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          BASE_TAG: ${{ steps.base.outputs.tag }}
+        run: |
+          set -euo pipefail
+          # A prior run tagged + published this release but failed before the main
+          # sync, leaving the tag off main and breaking release-plz stacking. Open
+          # the sync PR for the existing tag (no new release). If the original run
+          # also failed before notifying downstream, dispatch it manually.
+          BRANCH="chore/psl-resync-${BASE_TAG}"
+          git push origin --force "${BASE_TAG}:refs/heads/${BRANCH}"
+          gh pr create --base main --head "$BRANCH" \
+            --title "chore(data): sync released ${BASE_TAG} onto main" \
+            --body "Re-sync of released data ${BASE_TAG} that did not reach main in a prior run." \
+            || true
+          gh pr merge --auto --merge "$BRANCH"
 
       # Notify downstream consumers that embed the PSL via this crate so they can
       # rebuild + republish against the fresh data (off their own last release,
