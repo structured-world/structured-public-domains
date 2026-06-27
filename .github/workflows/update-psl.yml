@@ -35,6 +35,11 @@ jobs:
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0  # full history + tags needed to branch off the last release
+          # Do not persist the write-capable app token in .git/config: the job
+          # runs cargo (build scripts / proc-macros from dependencies) before any
+          # push, and a malicious one could read a persisted credential. Auth is
+          # re-attached to origin only inside the push steps, after cargo runs.
+          persist-credentials: false
 
       - name: Download fresh PSL
         run: curl -fsSL https://publicsuffix.org/list/public_suffix_list.dat -o /tmp/psl-fresh.dat
@@ -224,6 +229,11 @@ jobs:
           } > /tmp/commit-msg.txt
           git commit -F /tmp/commit-msg.txt
 
+          # Attach the token to origin now (checkout used persist-credentials:
+          # false), after the untrusted cargo steps have already run.
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
           # Push the TAG first: if a later step fails, the resync path recovers
           # from "tag exists but not on main". The branch push uses
           # --force-with-lease so a rerun is idempotent even if a prior run left
@@ -266,6 +276,9 @@ jobs:
           # missing — recreate it so the tag actually publishes. If it failed
           # before notifying downstream, dispatch that manually.
           BRANCH="chore/psl-resync-${BASE_TAG}"
+          # Re-attach the token to origin (checkout used persist-credentials: false).
+          git remote set-url origin \
+            "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           git push origin --force "${BASE_TAG}:refs/heads/${BRANCH}"
           gh release view "$BASE_TAG" >/dev/null 2>&1 || \
             gh release create "$BASE_TAG" --title "$BASE_TAG" \
