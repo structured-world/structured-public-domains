@@ -224,11 +224,14 @@ jobs:
           } > /tmp/commit-msg.txt
           git commit -F /tmp/commit-msg.txt
 
-          # Push the branch + tag, then create the GitHub release whose notes are
-          # the domain diff. The release event triggers publishing.
-          git push -u origin "$BRANCH"
+          # Push the TAG first: if a later step fails, the resync path recovers
+          # from "tag exists but not on main". The branch push uses
+          # --force-with-lease so a rerun is idempotent even if a prior run left
+          # the remote branch behind (avoids a permanent non-fast-forward block).
+          # The release event triggers publishing.
           git tag "v${NEW}"
           git push origin "v${NEW}"
+          git push --force-with-lease -u origin "$BRANCH"
           gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
 
           echo "new_version=$NEW" >> "$GITHUB_ENV"
