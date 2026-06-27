@@ -224,3 +224,27 @@ jobs:
             --title "feat(data): update PSL (+${{ steps.diff.outputs.added }} -${{ steps.diff.outputs.removed }})" \
             --body "Sync of released data v${{ env.new_version }} onto main."
           gh pr merge --auto --merge chore/psl-update
+
+      # Notify downstream consumers that embed the PSL via this crate so they can
+      # rebuild + republish against the fresh data (off their own last release,
+      # not touching their unreleased code). Token is scoped to the downstream
+      # repo (SW Release Bot must be installed there).
+      - name: Generate downstream token
+        id: downstream-token
+        if: steps.diff.outputs.changed == 'true'
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.RELEASER_APP_ID }}
+          private-key: ${{ secrets.RELEASER_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: structured-email-address
+
+      - name: Trigger downstream rebuild (structured-email-address)
+        if: steps.diff.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.downstream-token.outputs.token }}
+        run: |
+          gh api "repos/${{ github.repository_owner }}/structured-email-address/dispatches" \
+            -f event_type=psl-updated \
+            -F "client_payload[version]=${{ env.new_version }}" \
+            -F "client_payload[crate]=${{ github.event.repository.name }}"
