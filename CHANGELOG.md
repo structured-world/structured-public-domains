@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.8](https://github.com/structured-world/structured-public-domains/compare/v0.0.7...v0.0.8) - 2026-06-26
+
+### Added
+
+- *(npm)* tiny build — runtime-fetched PSL with local cache ([#35](https://github.com/structured-world/structured-public-domains/pull/35))
+
 ## [0.0.6](https://github.com/structured-world/structured-public-domains/compare/v0.0.5...v0.0.6) - 2026-06-23
 
 ### Added
