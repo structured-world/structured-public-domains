@@ -245,6 +245,8 @@ jobs:
           gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
 
           echo "new_version=$NEW" >> "$GITHUB_ENV"
+          # Version to notify downstream about (shared with the resync path).
+          echo "dispatch_version=$NEW" >> "$GITHUB_ENV"
 
       - name: Sync the data release onto main
         if: steps.diff.outputs.changed == 'true'
@@ -273,8 +275,8 @@ jobs:
           # leaving the tag off main and breaking release-plz stacking. Open the
           # sync PR for the existing tag. If the prior run also failed at
           # `gh release create`, the release object (and crates.io publish) is
-          # missing — recreate it so the tag actually publishes. If it failed
-          # before notifying downstream, dispatch that manually.
+          # missing — recreate it so the tag actually publishes. The downstream
+          # dispatch then runs from the shared step below (it also covers resync).
           BRANCH="chore/psl-resync-${BASE_TAG}"
           # Re-attach the token to origin (checkout used persist-credentials: false).
           git remote set-url origin \
@@ -289,13 +291,18 @@ jobs:
             || true
           gh pr merge --auto --merge "$BRANCH"
 
+          # Notify downstream for this recovered release too — a prior run may
+          # have failed before dispatching. Same crates.io-gated dispatch as the
+          # changed path; version is the tag without its leading "v".
+          echo "dispatch_version=${BASE_TAG#v}" >> "$GITHUB_ENV"
+
       # Notify downstream consumers that embed the PSL via this crate so they can
       # rebuild + republish against the fresh data (off their own last release,
       # not touching their unreleased code). Token is scoped to the downstream
       # repo (SW Release Bot must be installed there).
       - name: Generate downstream token
         id: downstream-token
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' || steps.diff.outputs.resync == 'true'
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.RELEASER_APP_ID }}
@@ -304,7 +311,7 @@ jobs:
           repositories: structured-email-address
 
       - name: Trigger downstream rebuild (structured-email-address)
-        if: steps.diff.outputs.changed == 'true'
+        if: steps.diff.outputs.changed == 'true' || steps.diff.outputs.resync == 'true'
         env:
           GH_TOKEN: ${{ steps.downstream-token.outputs.token }}
         run: |
@@ -314,7 +321,9 @@ jobs:
           # PUBLISHED crate — not on this repo's main — so wait until the new
           # version is live on crates.io before dispatching, so the downstream can
           # bump immediately. (The sync-merge onto main is irrelevant downstream.)
-          ver="${{ env.new_version }}"
+          # Runs for both a fresh data release and a resync of a stranded release,
+          # so a partial prior run can never leave the downstream un-notified.
+          ver="${{ env.dispatch_version }}"
           for i in $(seq 1 30); do
             if curl -fsS "https://index.crates.io/st/ru/structured-public-domains" \
                  | grep -q "\"vers\":\"${ver}\""; then
