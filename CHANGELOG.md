@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.9](https://github.com/structured-world/structured-public-domains/compare/v0.0.8...v0.0.9) - 2026-06-28
+
+### Added
+
+- *(ci)* trigger downstream rebuild on PSL data release ([#38](https://github.com/structured-world/structured-public-domains/pull/38))
+
 ## [0.0.8](https://github.com/structured-world/structured-public-domains/compare/v0.0.7...v0.0.8) - 2026-06-26
 
 ### Added
