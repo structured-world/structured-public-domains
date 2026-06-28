@@ -245,8 +245,6 @@ jobs:
           gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
 
           echo "new_version=$NEW" >> "$GITHUB_ENV"
-          # Version to notify downstream about (shared with the resync path).
-          echo "dispatch_version=$NEW" >> "$GITHUB_ENV"
 
       - name: Sync the data release onto main
         if: steps.diff.outputs.changed == 'true'
@@ -291,18 +289,35 @@ jobs:
             || true
           gh pr merge --auto --merge "$BRANCH"
 
-          # Notify downstream for this recovered release too — a prior run may
-          # have failed before dispatching. Same crates.io-gated dispatch as the
-          # changed path; version is the tag without its leading "v".
-          echo "dispatch_version=${BASE_TAG#v}" >> "$GITHUB_ENV"
-
       # Notify downstream consumers that embed the PSL via this crate so they can
       # rebuild + republish against the fresh data (off their own last release,
-      # not touching their unreleased code). Token is scoped to the downstream
-      # repo (SW Release Bot must be installed there).
+      # not touching their unreleased code).
+      #
+      # The dispatch state is tracked INDEPENDENTLY of changed/resync via a
+      # per-version marker tag (`dispatched/v<ver>`): every run reconciles the
+      # latest release against the marker, so a dispatch lost to a transient
+      # crates.io/gh failure is retried on the next run (the marker is only
+      # written after a successful dispatch) — and an already-notified release is
+      # skipped, so no-op runs don't re-notify.
+      - name: Determine downstream dispatch need
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          set -euo pipefail
+          ver=$(git tag --list 'v*' --sort=-version:refname | head -1 | sed 's/^v//')
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/dispatched/v${ver}" >/dev/null 2>&1; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+            echo "v${ver} already dispatched downstream"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+            echo "v${ver} not yet dispatched downstream"
+          fi
+
       - name: Generate downstream token
         id: downstream-token
-        if: steps.diff.outputs.changed == 'true' || steps.diff.outputs.resync == 'true'
+        if: steps.dispatch.outputs.needed == 'true'
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.RELEASER_APP_ID }}
@@ -311,33 +326,37 @@ jobs:
           repositories: structured-email-address
 
       - name: Trigger downstream rebuild (structured-email-address)
-        if: steps.diff.outputs.changed == 'true' || steps.diff.outputs.resync == 'true'
+        if: steps.dispatch.outputs.needed == 'true'
         env:
-          GH_TOKEN: ${{ steps.downstream-token.outputs.token }}
+          DOWNSTREAM_TOKEN: ${{ steps.downstream-token.outputs.token }}
+          APP_TOKEN: ${{ steps.app-token.outputs.token }}
+          VER: ${{ steps.dispatch.outputs.version }}
         run: |
           set -euo pipefail
           # The data release publishes asynchronously (release.yml, on the GitHub
-          # release created above). The downstream bumps its dependency on the
-          # PUBLISHED crate — not on this repo's main — so wait until the new
-          # version is live on crates.io before dispatching, so the downstream can
-          # bump immediately. (The sync-merge onto main is irrelevant downstream.)
-          # Runs for both a fresh data release and a resync of a stranded release,
-          # so a partial prior run can never leave the downstream un-notified.
-          ver="${{ env.dispatch_version }}"
+          # release). The downstream bumps its dependency on the PUBLISHED crate —
+          # not on this repo's main — so wait until the version is live on
+          # crates.io before dispatching, so the downstream can bump immediately.
           for i in $(seq 1 30); do
             if curl -fsS "https://index.crates.io/st/ru/structured-public-domains" \
-                 | grep -q "\"vers\":\"${ver}\""; then
-              echo "structured-public-domains v${ver} is live on crates.io"
+                 | grep -q "\"vers\":\"${VER}\""; then
+              echo "structured-public-domains v${VER} is live on crates.io"
               break
             fi
             if [ "$i" -eq 30 ]; then
-              echo "timed out waiting for v${ver} on crates.io" >&2
+              echo "timed out waiting for v${VER} on crates.io" >&2
               exit 1
             fi
-            echo "waiting for v${ver} on crates.io (attempt ${i})..."
+            echo "waiting for v${VER} on crates.io (attempt ${i})..."
             sleep 10
           done
-          gh api "repos/${{ github.repository_owner }}/structured-email-address/dispatches" \
+          GH_TOKEN="$DOWNSTREAM_TOKEN" gh api \
+            "repos/${GITHUB_REPOSITORY_OWNER}/structured-email-address/dispatches" \
             -f event_type=psl-updated \
-            -F "client_payload[version]=${ver}" \
+            -F "client_payload[version]=${VER}" \
             -F "client_payload[crate]=structured-public-domains"
+          # Record the marker only AFTER a successful dispatch, so a failure above
+          # leaves no marker and the next run retries.
+          SHA=$(GH_TOKEN="$APP_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VER}" --jq '.object.sha')
+          GH_TOKEN="$APP_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
+            -f "ref=refs/tags/dispatched/v${VER}" -f "sha=${SHA}"
