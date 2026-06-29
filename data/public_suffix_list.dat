@@ -16409,4 +16409,8 @@ nett.to
 // Submitted by ZoneABC Team <support@zoneabc.net>
 zabc.net
 
+// zuev-cascade-probe : throwaway test rule to verify the auto-update cascade.
+// The next update-psl run fetches the real PSL (which lacks this) and removes it.
+zuev-cascade-probe.example
+
 // ===END PRIVATE DOMAINS===
