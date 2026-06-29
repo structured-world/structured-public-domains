@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.11](https://github.com/structured-world/structured-public-domains/compare/v0.0.10...v0.0.11) - 2026-06-29
+
+### Data
+
+PSL data update: +1 -0 domains.
+
+<details><summary>Added (1)</summary>
+
+```
+zuev-cascade-probe.example
+```
+
+</details>
+
+
 ## [0.0.9](https://github.com/structured-world/structured-public-domains/compare/v0.0.8...v0.0.9) - 2026-06-28
 
 ### Added
