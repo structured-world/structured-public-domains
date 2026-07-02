@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.13](https://github.com/structured-world/structured-public-domains/compare/v0.0.12...v0.0.13) - 2026-07-02
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+mayfirst.org
+```
+
+</details>
+
+
 ## [0.0.12](https://github.com/structured-world/structured-public-domains/compare/v0.0.11...v0.0.12) - 2026-06-30
 
 ### Data
