@@ -1,6 +1,6 @@
 {
   "name": "@structured-world/structured-public-domains",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "description": "Compact Public Suffix List (PSL) as a native TypeScript package: embedded ~108KB binary trie, synchronous zero-dependency lookups, ESM + CommonJS. Checked daily against publicsuffix.org.",
   "license": "Apache-2.0",
   "repository": {
