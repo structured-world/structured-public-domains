@@ -7,6 +7,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.16](https://github.com/structured-world/structured-public-domains/compare/v0.0.15...v0.0.16) - 2026-07-14
+
+### Data
+
+PSL data update: +21 -2 domains.
+
+<details><summary>Added (21)</summary>
+
+```
+aero.in
+alumni.in
+audnedal.no
+cyb.ge
+gielda.no
+hamarøy.no
+home64.de
+ipv64.de
+ipv64.net
+karlsøy.no
+llc.ge
+mygov.scot
+online.ge
+re.no
+school.in
+suohkan.no
+tjielte.no
+tnx.ge
+ub.in
+uenorge.no
+ulstein.no
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+audnedaln.no
+frei.no
+```
+
+</details>
+
+
 ## [0.0.15](https://github.com/structured-world/structured-public-domains/compare/v0.0.14...v0.0.15) - 2026-07-08
 
 ### Data
