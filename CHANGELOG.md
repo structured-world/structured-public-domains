@@ -7,6 +7,136 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.17](https://github.com/structured-world/structured-public-domains/compare/v0.0.16...v0.0.17) - 2026-07-15
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+ac.tj
+```
+
+</details>
+
+
+## [0.0.16](https://github.com/structured-world/structured-public-domains/compare/v0.0.15...v0.0.16) - 2026-07-14
+
+### Data
+
+PSL data update: +21 -2 domains.
+
+<details><summary>Added (21)</summary>
+
+```
+aero.in
+alumni.in
+audnedal.no
+cyb.ge
+gielda.no
+hamarøy.no
+home64.de
+ipv64.de
+ipv64.net
+karlsøy.no
+llc.ge
+mygov.scot
+online.ge
+re.no
+school.in
+suohkan.no
+tjielte.no
+tnx.ge
+ub.in
+uenorge.no
+ulstein.no
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+audnedaln.no
+frei.no
+```
+
+</details>
+
+
+## [0.0.15](https://github.com/structured-world/structured-public-domains/compare/v0.0.14...v0.0.15) - 2026-07-08
+
+### Data
+
+PSL data update: +3 -0 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+dev.cv
+sch.ac
+store.cv
+```
+
+</details>
+
+
+## [0.0.14](https://github.com/structured-world/structured-public-domains/compare/v0.0.13...v0.0.14) - 2026-07-07
+
+### Data
+
+PSL data update: +1 -2 domains.
+
+<details><summary>Added (1)</summary>
+
+```
+grok.me
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+biz.at
+info.at
+```
+
+</details>
+
+
+## [0.0.13](https://github.com/structured-world/structured-public-domains/compare/v0.0.12...v0.0.13) - 2026-07-02
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+mayfirst.org
+```
+
+</details>
+
+
+## [0.0.12](https://github.com/structured-world/structured-public-domains/compare/v0.0.11...v0.0.12) - 2026-06-30
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+zuev-cascade-probe.example
+```
+
+</details>
+
+
 ## [0.0.11](https://github.com/structured-world/structured-public-domains/compare/v0.0.10...v0.0.11) - 2026-06-29
 
 ### Data
