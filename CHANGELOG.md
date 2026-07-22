@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.19](https://github.com/structured-world/structured-public-domains/compare/v0.0.18...v0.0.19) - 2026-07-22
+
+### Data
+
+PSL data update: +4 -12 domains.
+
+<details><summary>Added (4)</summary>
+
+```
+su.it
+sud-sardegna.it
+sudsardegna.it
+verbano-cusio-ossola.it
+```
+
+</details>
+
+<details><summary>Removed (12)</summary>
+
+```
+*.cryptonomic.net
+api.stdlib.com
+aquila.it
+dh.bytemark.co.uk
+hzc.io
+onfabrica.com
+protonet.io
+storj.farm
+trentinosudtirol.it
+uk0.bigv.io
+valdaosta.it
+vm.bytemark.co.uk
+```
+
+</details>
+
+
 ## [0.0.17](https://github.com/structured-world/structured-public-domains/compare/v0.0.16...v0.0.17) - 2026-07-15
 
 ### Data
