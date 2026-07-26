@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.22](https://github.com/structured-world/structured-public-domains/compare/v0.0.21...v0.0.22) - 2026-07-26
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+*.on-acorn.io
+```
+
+</details>
+
+
 ## [0.0.21](https://github.com/structured-world/structured-public-domains/compare/v0.0.20...v0.0.21) - 2026-07-25
 
 ### Data
