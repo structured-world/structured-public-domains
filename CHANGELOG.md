@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.24](https://github.com/structured-world/structured-public-domains/compare/v0.0.23...v0.0.24) - 2026-08-18
+
+### Data
+
+PSL data update: +9 -1 domains.
+
+<details><summary>Added (9)</summary>
+
+```
+*.aivencloud.com
+*.cursorusercontent.com
+ams.scw.site
+codepen.app
+codepen.dev
+here.now
+online-server.cloud
+scw.site
+waw.scw.site
+```
+
+</details>
+
+<details><summary>Removed (1)</summary>
+
+```
+adaptable.app
+```
+
+</details>
+
+
 ## [0.0.23](https://github.com/structured-world/structured-public-domains/compare/v0.0.22...v0.0.23) - 2026-08-16
 
 ### Data
