@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.25](https://github.com/structured-world/structured-public-domains/compare/v0.0.24...v0.0.25) - 2026-08-20
+
+### Data
+
+PSL data update: +2 -1 domains.
+
+<details><summary>Added (2)</summary>
+
+```
+claudeusercontent.com
+frame.claudeusercontent.com
+```
+
+</details>
+
+<details><summary>Removed (1)</summary>
+
+```
+aivencloud.com
+```
+
+</details>
+
+
 ## [0.0.24](https://github.com/structured-world/structured-public-domains/compare/v0.0.23...v0.0.24) - 2026-08-18
 
 ### Data
