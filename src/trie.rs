@@ -27,20 +27,26 @@ struct TrieNode {
 /// to std for one static.
 static PSL: OnceBox<TrieNode> = OnceBox::new();
 
+/// Parse a whole trie image: one root node that accounts for every byte.
+///
+/// Separate from [`psl`] so the trailing-bytes rejection can be exercised on a
+/// crafted image; the embedded data is valid by construction, so a closure over
+/// it could never reach that arm.
+fn parse_trie(data: &[u8]) -> Option<TrieNode> {
+    let mut cursor = 0;
+    let node = parse_node(data, &mut cursor)?;
+    // Trailing bytes mean the image is not what the encoder produced, even
+    // though the root parsed: refuse it rather than ignore the remainder.
+    if cursor != data.len() {
+        return None;
+    }
+    Some(node)
+}
+
 fn psl() -> &'static TrieNode {
     PSL.get_or_init(|| {
         #[allow(clippy::expect_used)]
-        Box::new(
-            (|| {
-                let mut cursor = 0;
-                let node = parse_node(PSL_DATA, &mut cursor)?;
-                if cursor != PSL_DATA.len() {
-                    return None;
-                }
-                Some(node)
-            })()
-            .expect("embedded PSL data is corrupt — rebuild required"),
-        )
+        Box::new(parse_trie(PSL_DATA).expect("embedded PSL data is corrupt — rebuild required"))
     })
 }
 

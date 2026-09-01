@@ -25,6 +25,30 @@ fn encode_node(flags: u8, children: &[(&str, &[u8])]) -> Vec<u8> {
 }
 
 #[test]
+fn parse_trie_accepts_an_image_it_consumes_entirely() {
+    let data = encode_node(1, &[]);
+    assert!(parse_trie(&data).is_some());
+}
+
+#[test]
+fn parse_trie_rejects_trailing_bytes() {
+    // The root parses on its own, so only the whole-image check can catch this.
+    // Trailing bytes mean the image is not what the encoder produced, and
+    // ignoring the remainder would silently accept a truncated or spliced file.
+    let mut data = encode_node(1, &[]);
+    data.push(0);
+    assert!(parse_node(&data, &mut 0).is_some(), "the root still parses");
+    assert!(parse_trie(&data).is_none(), "the image as a whole must not");
+}
+
+#[test]
+fn parse_trie_rejects_an_image_whose_root_is_malformed() {
+    // Reserved flag bits are undefined, so the root fails before the
+    // whole-image check is reached.
+    assert!(parse_trie(&[0xff, 0, 0]).is_none());
+}
+
+#[test]
 fn parse_node_tiny_trie_with_special_labels() {
     let wildcard = encode_node(1, &[]);
     let exception = encode_node(1, &[]);
