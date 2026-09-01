@@ -69,16 +69,28 @@ jobs:
       # approval is left to the repository's stale-review dismissal, which is
       # the setting that exists for it.
       #
-      # `triggering_actor` as well as `actor`: on a rerun the latter keeps the
-      # original run's value, so only the former shows who asked for this one.
+      # A rerun is not a push, and this is where the two must not be confused.
+      # Rerunning a Dependabot run leaves `actor` as dependabot and makes
+      # `triggering_actor` whoever asked — the same shape a foreign push has,
+      # except that nothing moved. Comparing the head does not tell them apart
+      # either, since a rerun has the head it always had. So the attempt number
+      # is what separates them: only a first attempt is a real event, and only a
+      # real event can have moved anything. Without that, a maintainer rerunning
+      # checks would disarm the auto-merge Dependabot armed, with the metadata
+      # step skipped and so nothing to arm it again, and the pull request would
+      # sit there.
+      #
+      # The approval step keeps reading both actors, because there the rerunner
+      # is exactly who it needs to know about.
       #
       # A push made with a token that does not trigger workflows raises no
       # `synchronize` event and so reaches nothing here. That is a property of
       # the event, not something this job can close.
       - name: Disarm auto-merge when someone else moved the head
         if: >-
-          github.actor != 'dependabot[bot]'
-          || github.triggering_actor != 'dependabot[bot]'
+          github.run_attempt == 1
+          && (github.actor != 'dependabot[bot]'
+              || github.triggering_actor != 'dependabot[bot]')
         # The head is checked because disarming has no precondition of its own:
         # `--match-head-commit` maps to `expectedHeadOid`, which the mutation
         # behind `--disable-auto` does not take. Without the check, a slow run
