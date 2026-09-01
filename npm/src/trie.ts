@@ -256,6 +256,20 @@ function validateNode(node: TrieNode): number {
   let previous: string | undefined;
   let sawWildcard = false;
   for (let i = 0; i < header.children; i++) {
+    // Lookups reach an indexed node's children through the index, never by
+    // walking. Validating the walk alone would therefore accept an image whose
+    // index points somewhere else entirely — and `tiny` would cache it, after
+    // which every lookup under this node silently answers from the wrong entry.
+    if (header.indexed) {
+      const slot = indexEntry(node, header, i);
+      if (slot === undefined) {
+        throw new Error("PSL data: index offset out of bounds");
+      }
+      if (slot !== at) {
+        throw new Error("PSL data: index offset does not point at its entry");
+      }
+    }
+
     const len = node.image[at];
     if (len === undefined) throw new Error("PSL data: unexpected end of data");
     if (len === 0) throw new Error("PSL data: empty label");

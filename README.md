@@ -127,7 +127,9 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Private domain (`mysite.github.io`) | ~450 ns | ~2.2M/s |
 | Long chain (`very.deep...co.uk`) | ~500 ns | ~2.0M/s |
 
-**Runtime memory: none.** The trie is searched in place, straight out of the embedded image, so there is nothing to parse, nothing to allocate, no lazy initialization and nothing to synchronize on the first call. `include_bytes!` puts the ~108KB image in read-only data, which the loader maps on a hosted target and the linker places in flash on a bare-metal one; a lookup walks it where it lies. Only the returned strings allocate.
+**Runtime memory: nothing at rest.** The trie is searched in place, straight out of the embedded image, so there is nothing to parse, no structure to keep, no lazy initialization and nothing to synchronize on the first call. `include_bytes!` puts the ~108KB image in read-only data, which the loader maps on a hosted target and the linker places in flash on a bare-metal one; a lookup walks it where it lies.
+
+A lookup itself does allocate, and an allocator-constrained caller should size for it: a `Vec` of the input's labels, a reusable buffer for the lowercased label being matched, and the returned suffix and registrable domain. Peak is a few hundred bytes for an ordinary domain, all released when the result is dropped.
 
 ## Why not `psl`?
 
@@ -136,7 +138,7 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Embedded data | ~876KB (codegen match tree) | **108KB** (compact binary trie) |
 | Source size | 2.4MB codegen | 300 lines + 108KB blob |
 | Runtime deps | None | **None** |
-| Runtime memory | N/A (static) | **None** (searched in place) |
+| Runtime memory | N/A (static) | **None at rest** (searched in place) |
 | Lookup | O(depth) match tree | O(depth * log k) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 

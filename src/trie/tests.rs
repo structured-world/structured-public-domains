@@ -153,11 +153,35 @@ fn a_truncated_image_never_panics() {
     // outside the slice or panic; returning nothing is the only acceptable
     // failure.
     for cut in [0, 1, 2, 3, 7, 64, 1000, 50_000, PSL_DATA.len() - 1] {
-        let image = &PSL_DATA[..cut];
-        let root = Node::root(image);
-        let _ = root.is_suffix_boundary();
-        for probe in ["com", "uk", "zzzz", "*", "!city"] {
-            let _ = root.child(probe);
+        probe_every_depth(&PSL_DATA[..cut]);
+    }
+}
+
+/// Walk several multi-label paths, not just the root's children.
+///
+/// `child` hands back a node without reading its header, so corruption one
+/// level down is only reached by descending. A probe that stops at the root
+/// would pass on an image whose second level is unreadable.
+fn probe_every_depth(image: &[u8]) {
+    let root = Node::root(image);
+    let _ = root.is_suffix_boundary();
+    let _ = root.has_wildcard_child();
+
+    for path in [
+        ["uk", "co", "example"],
+        ["com", "example", "www"],
+        ["jp", "tokyo", "metro"],
+        ["zzzz", "nope", "gone"],
+        ["*", "!city", "x"],
+    ] {
+        let mut node = root;
+        for label in path {
+            let _ = node.is_suffix_boundary();
+            let _ = node.has_wildcard_child();
+            match node.child(label) {
+                Some(next) => node = next,
+                None => break,
+            }
         }
     }
 }
@@ -171,10 +195,11 @@ fn a_mutated_image_never_panics() {
         let at = (step * 53) % image.len();
         let original = image[at];
         image[at] = original.wrapping_add(0x9E);
-        let root = Node::root(&image);
-        for probe in ["com", "co.uk", "example", "zzzz"] {
-            let _ = root.child(probe);
-        }
+        // `lookup` reads the embedded image, so it cannot be pointed at this
+        // one; `probe_every_depth` covers the same reads a lookup performs —
+        // the wildcard bit, the exception probe and the descent — against the
+        // mutated bytes.
+        probe_every_depth(&image);
         image[at] = original;
     }
 }

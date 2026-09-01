@@ -140,6 +140,12 @@ def serialize_node(node: dict) -> bytearray:
         # written once and placed anywhere.
         offset = len(header) + 3 * count
         for entry in entries:
+            # Truncating to three bytes without a check would emit a wrong
+            # offset and send both readers binary-searching into the wrong
+            # entry, on an image that still looks well formed.
+            if offset > 0xFFFFFF:
+                print(f"Index offset exceeds u24: {offset}", file=sys.stderr)
+                sys.exit(1)
             index += struct.pack("<I", offset)[:3]
             offset += len(entry)
 

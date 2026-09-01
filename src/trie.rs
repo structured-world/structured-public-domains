@@ -1,6 +1,5 @@
 //! PSL trie: search the embedded binary image in place.
 
-use alloc::format;
 use alloc::string::String;
 use alloc::vec::Vec;
 
@@ -305,17 +304,24 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
         known = false;
     }
 
-    let suffix_labels: Vec<String> = labels[..suffix_depth]
-        .iter()
-        .rev()
-        .map(|l| l.to_lowercase())
-        .collect();
-    let suffix = suffix_labels.join(".");
+    // Built directly rather than collected into a `Vec<String>` and joined: the
+    // vector and every string in it existed only to be concatenated, so on a
+    // three-label suffix that was four allocations to produce one.
+    let mut suffix = String::new();
+    for label in labels[..suffix_depth].iter().rev() {
+        if !suffix.is_empty() {
+            suffix.push('.');
+        }
+        suffix.extend(label.chars().flat_map(char::to_lowercase));
+    }
 
     let registrable = if labels.len() > suffix_depth {
-        // eTLD+1: registrable label + suffix (all lowercased)
-        let reg_label = labels[suffix_depth].to_lowercase();
-        Some(format!("{reg_label}.{suffix}"))
+        // eTLD+1: the registrable label, then the suffix already built above.
+        let mut reg = String::with_capacity(labels[suffix_depth].len() + 1 + suffix.len());
+        reg.extend(labels[suffix_depth].chars().flat_map(char::to_lowercase));
+        reg.push('.');
+        reg.push_str(&suffix);
+        Some(reg)
     } else {
         None
     };
