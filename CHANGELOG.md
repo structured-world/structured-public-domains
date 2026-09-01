@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.26](https://github.com/structured-world/structured-public-domains/compare/v0.0.25...v0.0.26) - 2026-09-01
+
+### Added
+
+- build against core and alloc instead of std ([#73](https://github.com/structured-world/structured-public-domains/pull/73))
+
 ## [0.0.25](https://github.com/structured-world/structured-public-domains/compare/v0.0.24...v0.0.25) - 2026-08-20
 
 ### Data
