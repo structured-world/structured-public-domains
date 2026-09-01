@@ -8,7 +8,7 @@ Compact Public Suffix List (PSL) for Rust.
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-- **Zero** runtime dependencies
+- **`no_std` + `alloc`** — runs in a WASM sandbox or on bare metal
 - **~108KB** embedded data (compact binary trie)
 - **~2.4M lookups/sec** on a single core (~420 ns per lookup)
 - **O(depth * log k)** trie traversal with per-node binary search (typically 2-3 steps)
@@ -31,6 +31,18 @@ assert!(info.is_known());
 // Helpers
 assert_eq!(registrable_domain("sub.example.com"), Some("example.com".to_string()));
 assert!(is_known_suffix("example.com"));
+```
+
+### Without `std`
+
+The lookup path needs an allocator and nothing else, so it builds for WASM and
+for bare metal. CI checks this on `thumbv7em-none-eabihf`, a target with no
+`std` at all: checking it on a host target proves nothing, because feature
+resolution can pull `std` back in and the build passes where the real target
+fails.
+
+```toml
+structured-public-domains = { version = "0", default-features = false, features = ["alloc"] }
 ```
 
 ## Usage (JavaScript / TypeScript)
@@ -129,7 +141,7 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Lookup | O(depth) match tree | O(depth * log k) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 
-Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data and auto-updates daily via GitHub Actions with domain-level changelogs.
+Both crates have comparable lookup speed. `structured-public-domains` has ~8x smaller embedded data, builds without `std`, and auto-updates daily via GitHub Actions with domain-level changelogs.
 
 ## Support the Project
 

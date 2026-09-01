@@ -439,6 +439,7 @@ name = "structured-public-domains"
 version = "0.0.25"
 dependencies = [
  "criterion",
+ "once_cell",
 ]
 
 [[package]]
