@@ -161,6 +161,22 @@ jobs:
           # unreleased code that may be sitting on main.
           git checkout -B "$BRANCH" "$BASE_TAG"
 
+          # The bot pushes a ref cut from that tag, so any workflow file edited on
+          # main since then reads to GitHub as a workflow update and the push is
+          # rejected ("refusing to allow a GitHub App to create or update workflow
+          # ... without `workflows` permission"). Bring the workflows up to main's
+          # content first, as their own commit, so the pushed ref carries nothing
+          # the guard can object to and the data commit stays a pure data change.
+          # Deleting the directory first also drops a workflow main has removed.
+          # (This is what froze the downstream cascade for a month before it was
+          # retired: structured-world/structured-email-address#73.)
+          git fetch origin main --quiet
+          rm -rf .github/workflows
+          git checkout origin/main -- .github/workflows
+          git add -A .github/workflows
+          git diff --cached --quiet \
+            || git commit -m "ci: carry main's workflows into the data release"
+
           cp /tmp/psl-fresh.dat data/public_suffix_list.dat
           python3 scripts/build-psl.py
 
@@ -278,7 +294,20 @@ jobs:
           # Re-attach the token to origin (checkout used persist-credentials: false).
           git remote set-url origin \
             "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git push origin --force "${BASE_TAG}:refs/heads/${BRANCH}"
+          git config user.name "sw-release-bot[bot]"
+          git config user.email "sw-release-bot[bot]@users.noreply.github.com"
+          git checkout -B "$BRANCH" "$BASE_TAG"
+          # Same workflow-guard overlay as the cut path: the baseline tag may
+          # predate a workflow edit on main, and the bot cannot push a ref that
+          # reads as a workflow update. The tag stays an ancestor of the branch,
+          # which is what the merge below has to preserve.
+          git fetch origin main --quiet
+          rm -rf .github/workflows
+          git checkout origin/main -- .github/workflows
+          git add -A .github/workflows
+          git diff --cached --quiet \
+            || git commit -m "ci: carry main's workflows into the data release"
+          git push --force-with-lease -u origin "$BRANCH"
           gh release view "$BASE_TAG" >/dev/null 2>&1 || \
             gh release create "$BASE_TAG" --title "$BASE_TAG" \
               --notes "PSL data release ${BASE_TAG} (resynced)."
