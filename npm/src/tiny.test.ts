@@ -36,18 +36,31 @@ const uniqueCacheDir = () => join(tmpdir(), `spd-tiny-test-${Math.random().toStr
  */
 function buildAltTrie(): Uint8Array {
   const enc = new TextEncoder();
-  const leaf = (boundary: boolean) => Uint8Array.from([boundary ? 1 : 0, 0, 0]);
+  // A leaf: header only, no children, no index.
+  const leaf = (boundary: boolean) => Uint8Array.from([boundary ? 0x80 : 0]);
   // Sorted, distinct labels: filler "f000".."f249" then "zzztest" (a known TLD).
   const children: [string, Uint8Array][] = [];
   for (let i = 0; i < 250; i++) children.push([`f${String(i).padStart(3, "0")}`, leaf(false)]);
   children.push(["zzztest", leaf(true)]);
 
-  const parts: number[] = [0, children.length & 0xff, (children.length >> 8) & 0xff];
-  for (const [label, child] of children) {
+  // 251 children is past the header's 5-bit field and past the index threshold,
+  // so this root takes the u16 count and an offset index — the same shape the
+  // real image gives its widest nodes, which is what makes it worth testing.
+  const header = [0x40 | 0x1f, children.length & 0xff, (children.length >> 8) & 0xff];
+
+  const entries = children.map(([label, child]) => {
     const lb = enc.encode(label);
-    parts.push(lb.length, ...lb, ...child);
+    return [lb.length, ...lb, ...child];
+  });
+
+  const index: number[] = [];
+  let offset = header.length + 3 * entries.length;
+  for (const entry of entries) {
+    index.push(offset & 0xff, (offset >> 8) & 0xff, (offset >> 16) & 0xff);
+    offset += entry.length;
   }
-  return Uint8Array.from(parts);
+
+  return Uint8Array.from([...header, ...index, ...entries.flat()]);
 }
 
 describe("tiny load + lookup", () => {

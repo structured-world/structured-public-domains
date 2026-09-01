@@ -3,8 +3,17 @@ import { defineConfig } from "tsup";
 import pkg from "./package.json";
 
 // Pin the tiny entry's default CDN URL to this package's major.minor range, so
-// it tracks PSL-data patch releases (which keep the trie format) but never
-// fetches a future format-breaking release the shipped parser can't read.
+// it tracks PSL-data patch releases without a reinstall.
+//
+// Note what this does NOT buy while the package is pre-1.0: the range is
+// minor-locked (jsDelivr resolves `@0.0` within 0.0.x, the way `@2.0` resolves
+// to 2.0.x and not 2.7.x), but the trie format has changed inside 0.0.x. An
+// already-installed tiny client therefore fetches a blob its bundled parser
+// cannot read, and `load()` rejects within the cache TTL. That is accepted here
+// deliberately: nothing depends on this package in production yet, and paying a
+// minor bump — or carrying two serialisers — to protect hypothetical installs
+// costs more than it saves. Revisit at 1.0, when the range genuinely has to
+// mean a stable format.
 const [major, minor] = pkg.version.split(".");
 const pslRange = `${major}.${minor}`;
 

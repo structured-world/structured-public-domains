@@ -257,6 +257,26 @@ jobs:
           # The release event triggers publishing.
           git tag "v${NEW}"
           git push origin "v${NEW}"
+
+          # The tag is now frozen and self-consistent: the reader released at
+          # BASE_TAG together with a blob its own serializer produced. What gets
+          # merged into main must instead match MAIN's serializer, because
+          # `src/psl.bin` is generated and main may have changed how.
+          #
+          # Without this the two sides collide on a generated file whenever the
+          # format changes on main, and the sync stalls until a code release
+          # happens to land — an ordering rule someone has to remember. Since
+          # `data/public_suffix_list.dat` is the real input and the blob is
+          # derived from it, the branch can simply regenerate past the tag:
+          # release keeps its format, main keeps its own, the data reaches both.
+          # When the serializer has not changed this rebuilds byte-identical
+          # output and commits nothing.
+          git checkout origin/main -- scripts/build-psl.py
+          python3 scripts/build-psl.py
+          git add -A scripts/build-psl.py src/psl.bin
+          git diff --cached --quiet \
+            || git commit -m "chore(data): rebuild the blob with main's serializer"
+
           git push --force-with-lease -u origin "$BRANCH"
           gh release create "v${NEW}" --title "v${NEW}" --notes-file /tmp/domains.txt
 
