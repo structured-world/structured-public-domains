@@ -59,15 +59,19 @@ jobs:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
         with:
-          # A bare-metal target with no `std` at all. Checking this on a host
-          # target would prove nothing: with std present, feature resolution can
-          # pull it back in and the build passes where the real target fails.
-          targets: thumbv7em-none-eabihf
+          # Bare-metal targets, which is the point: a host check cannot fail on a
+          # constraint the host does not have. `std` is present there, so code
+          # reaching for it still compiles; thumbv6m additionally has no
+          # compare-and-swap, which catches anything reaching for pointer-width
+          # atomics.
+          targets: thumbv7em-none-eabihf, thumbv6m-none-eabi
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: no-std
       - name: Check (no_std + alloc)
         run: cargo check --target thumbv7em-none-eabihf --no-default-features --features alloc
+      - name: Check (no_std + alloc, no compare-and-swap)
+        run: cargo check --target thumbv6m-none-eabi --no-default-features --features alloc
       - name: Clippy (no_std + alloc)
         run: cargo clippy --target thumbv7em-none-eabihf --no-default-features --features alloc -- -D warnings
 

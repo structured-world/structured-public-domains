@@ -23,12 +23,6 @@ alloc = []
 std = ["alloc"]
 
 [dependencies]
-# Holds the lazily parsed trie. `race::OnceBox` is the core+alloc equivalent of
-# `std::sync::OnceLock`, which would tie the crate to std for one static.
-once_cell = { version = "1", default-features = false, features = [
-    "alloc",
-    "race",
-] }
 
 [dev-dependencies]
 criterion = { version = "0.8", features = ["html_reports"] }
