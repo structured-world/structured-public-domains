@@ -8,7 +8,8 @@ Binary format (DFS preorder):
     Node   = [header] [index?] [entry₁ entry₂ ...]
     header = u8: bit 7 = suffix boundary
                  bit 6 = index present
-                 bits 0-5 = child count, or 0x3F meaning a u16_le count follows
+                 bit 5 = a "*" wildcard child is present
+                 bits 0-4 = child count, or 0x1F meaning a u16_le count follows
     index  = [entry_offset:u24_le] * child_count, each relative to the node's
              first byte; present only when the child count reaches INDEX_MIN
     entry  = [label_len:u8] [label_bytes...] [subtree_len:varint] [child node]
@@ -29,6 +30,13 @@ nodes and grows the image past what it replaces. At INDEX_MIN the 20 widest
 nodes — the root among them, with 1,449 children — take the index and the rest
 scan at most INDEX_MIN-1 short labels.
 
+The wildcard bit is what the fifth header bit buys. A lookup has to ask every
+node it passes whether a `*` child exists, because a wildcard rule outranks a
+non-boundary exact match, and almost every answer is no: searching for it was
+half of all the searching a lookup did. Answering from a bit costs one byte on
+the 41 nodes whose child count no longer fits five bits, 82 bytes over the whole
+image.
+
 Reads:  data/public_suffix_list.dat
 Writes: src/psl.bin
 """
@@ -47,8 +55,8 @@ OUTPUT_PATH = REPO_ROOT / "src" / "psl.bin"
 # while 48 would exceed it. Keep in step with `INDEX_MIN` in src/trie.rs.
 INDEX_MIN = 64
 
-# Child count that no longer fits the header's 6-bit field; a u16 follows.
-COUNT_ESCAPE = 0x3F
+# Child count that no longer fits the header's 5-bit field; a u16 follows.
+COUNT_ESCAPE = 0x1F
 
 
 def build_trie(psl_path: Path) -> dict:
@@ -112,7 +120,12 @@ def serialize_node(node: dict) -> bytearray:
         entries.append(entry + body)
 
     header = bytearray()
-    flags = (0x80 if node["s"] else 0) | (0x40 if has_index else 0)
+    has_wildcard = any(label == "*" for label, _ in children)
+    flags = (
+        (0x80 if node["s"] else 0)
+        | (0x40 if has_index else 0)
+        | (0x20 if has_wildcard else 0)
+    )
     if count < COUNT_ESCAPE:
         header += struct.pack("<B", flags | count)
     else:

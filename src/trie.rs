@@ -23,8 +23,8 @@ const PSL_DATA: &[u8] = include_bytes!("psl.bin");
 #[cfg(test)]
 const INDEX_MIN: usize = 64;
 
-/// Child count that no longer fits the header's 6-bit field.
-const COUNT_ESCAPE: u8 = 0x3F;
+/// Child count that no longer fits the header's 5-bit field.
+const COUNT_ESCAPE: u8 = 0x1F;
 
 /// Width of an index entry: a `u24` offset from the node's first byte.
 const INDEX_ENTRY: usize = 3;
@@ -44,6 +44,13 @@ struct Node<'a> {
 struct Header {
     suffix_boundary: bool,
     indexed: bool,
+    /// Whether a `*` child exists, answered without searching for it.
+    ///
+    /// A lookup must ask this of every node it passes, because a wildcard rule
+    /// outranks a non-boundary exact match, and the answer is almost always no.
+    /// Reading it from the header rather than searching removes one search per
+    /// level, which was half of all the searching a lookup did.
+    wildcard: bool,
     children: usize,
     /// Offset of the first byte after the header, relative to the image.
     body: usize,
@@ -67,6 +74,7 @@ impl<'a> Node<'a> {
         Some(Header {
             suffix_boundary: byte & 0x80 != 0,
             indexed: byte & 0x40 != 0,
+            wildcard: byte & 0x20 != 0,
             children,
             body,
         })
@@ -157,6 +165,12 @@ impl<'a> Node<'a> {
 
     fn has_child(&self, label: &str) -> bool {
         self.child(label).is_some()
+    }
+
+    /// Whether this node has a `*` child, from the header bit rather than a
+    /// search.
+    fn has_wildcard_child(&self) -> bool {
+        self.header().is_some_and(|h| h.wildcard)
     }
 }
 
@@ -258,7 +272,7 @@ pub fn lookup(domain: &str) -> Option<DomainInfo> {
         // Record wildcard match as fallback BEFORE trying exact match.
         // This ensures wildcards are not shadowed by non-boundary exact children
         // (e.g., *.futurecms.at must still match even though "ex" exists as a child).
-        if node.has_child("*") {
+        if node.has_wildcard_child() {
             // Exception rules (`!label`) cancel the wildcard for this specific label.
             label_buf.insert(0, '!');
             if node.has_child(label_buf.as_str()) {

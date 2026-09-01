@@ -194,6 +194,16 @@ fn the_embedded_image_indexes_exactly_the_wide_nodes() {
             header.children,
             header.indexed
         );
+        // The wildcard bit is read instead of searching, so a generator that set
+        // it wrong would silently change which rules apply — and only for the
+        // domains under that one node.
+        assert_eq!(
+            header.wildcard,
+            node.has_child("*"),
+            "node at {} claims wildcard={} but the search disagrees",
+            node.at,
+            header.wildcard
+        );
         *seen += 1;
 
         let mut at = header.body;
