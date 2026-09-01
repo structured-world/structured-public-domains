@@ -1,6 +1,6 @@
 [package]
 name = "structured-public-domains"
-version = "0.0.25"
+version = "0.0.26"
 edition = "2024"
 rust-version = "1.92"
 authors = ["Structured World Foundation <foundation@sw.foundation>"]
