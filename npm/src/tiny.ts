@@ -9,7 +9,13 @@
 // is the only cache. All of it is best-effort — a cache failure never breaks a
 // lookup, it just falls back to a network fetch.
 
-import { lookupTrie, parseTrie, type DomainInfo, type TrieNode } from "./trie.js";
+import {
+  lookupTrie,
+  parseTrie,
+  validateTrie,
+  type DomainInfo,
+  type TrieNode,
+} from "./trie.js";
 
 // Injected at build time (tsup `define`) as this package's "major.minor" range;
 // falls back to "0.0" when run from source (tests). Pinning the CDN URL to the
@@ -121,6 +127,7 @@ async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]>
     const cached = await readCache(url, ttlMs, opts.cacheDir);
     if (cached !== undefined) {
       try {
+        validateTrie(cached);
         return [cached, parseTrie(cached)];
       } catch {
         await deleteCache(url, opts.cacheDir).catch(() => undefined);
@@ -132,7 +139,8 @@ async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]>
     throw new Error("no fetch implementation available; pass `fetch` in LoadOptions");
   }
   const data = await fetchBytes(doFetch, url);
-  // Parse before caching so a bad network body is never persisted.
+  // Validate before caching so a bad network body is never persisted.
+  validateTrie(data);
   const trie = parseTrie(data);
   if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
   return [data, trie];

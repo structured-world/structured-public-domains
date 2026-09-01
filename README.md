@@ -8,7 +8,7 @@ Compact Public Suffix List (PSL) for Rust.
 [![docs.rs](https://docs.rs/structured-public-domains/badge.svg)](https://docs.rs/structured-public-domains)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-- **Zero** runtime dependencies
+- **`no_std` + `alloc`** — runs in a WASM sandbox or on bare metal
 - **~108KB** embedded data (compact binary trie)
 - **~2.4M lookups/sec** on a single core (~420 ns per lookup)
 - **O(depth * log k)** trie traversal with per-node binary search (typically 2-3 steps)
@@ -31,6 +31,17 @@ assert!(info.is_known());
 // Helpers
 assert_eq!(registrable_domain("sub.example.com"), Some("example.com".to_string()));
 assert!(is_known_suffix("example.com"));
+```
+
+### Without `std`
+
+The lookup path needs an allocator for the strings it returns and nothing else:
+no `std`, and no pointer-width atomic, so parts without a compare-and-swap are
+in scope too. CI checks `thumbv7em-none-eabihf` and `thumbv6m-none-eabi`,
+because a host check cannot fail on a constraint the host does not have.
+
+```toml
+structured-public-domains = { version = "0", default-features = false, features = ["alloc"] }
 ```
 
 ## Usage (JavaScript / TypeScript)
@@ -116,7 +127,9 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Private domain (`mysite.github.io`) | ~450 ns | ~2.2M/s |
 | Long chain (`very.deep...co.uk`) | ~500 ns | ~2.0M/s |
 
-**Runtime memory:** The PSL trie is parsed lazily on first call (`OnceLock`), then cached for the lifetime of the process. Runtime footprint is ~530 KB (sorted `Vec` children with binary search lookup). The ~108KB binary blob is embedded in the binary at compile time.
+**Runtime memory: nothing at rest.** The trie is searched in place, straight out of the embedded image, so there is nothing to parse, no structure to keep, no lazy initialization and nothing to synchronize on the first call. `include_bytes!` puts the ~108KB image in read-only data, which the loader maps on a hosted target and the linker places in flash on a bare-metal one; a lookup walks it where it lies.
+
+A lookup itself does allocate, and an allocator-constrained caller should size for it: a `Vec` of the input's labels, a reusable buffer for the lowercased label being matched, and the returned suffix and registrable domain. Peak is a few hundred bytes for an ordinary domain, all released when the result is dropped.
 
 ## Why not `psl`?
 
@@ -125,11 +138,11 @@ Benchmarks on Apple M-series (criterion, `cargo bench`):
 | Embedded data | ~876KB (codegen match tree) | **108KB** (compact binary trie) |
 | Source size | 2.4MB codegen | 300 lines + 108KB blob |
 | Runtime deps | None | **None** |
-| Runtime memory | N/A (static) | **~530KB** |
+| Runtime memory | N/A (static) | **None at rest** (searched in place) |
 | Lookup | O(depth) match tree | O(depth * log k) trie walk |
 | Auto-update | New crate version | Daily GitHub Actions check |
 
-Both crates have comparable lookup speed and zero runtime dependencies. `structured-public-domains` has ~8x smaller embedded data and auto-updates daily via GitHub Actions with domain-level changelogs.
+Both crates have comparable lookup speed. `structured-public-domains` has ~8x smaller embedded data, allocates nothing at rest, builds without `std` or pointer-width atomics, and auto-updates daily via GitHub Actions with domain-level changelogs.
 
 ## Support the Project
 

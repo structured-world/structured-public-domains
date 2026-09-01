@@ -124,8 +124,10 @@ describe("pslData", () => {
     const data = pslData();
     expect(data).toBeInstanceOf(Uint8Array);
     expect(data.length).toBeGreaterThan(50_000);
-    // Root node flags byte: not a suffix boundary.
-    expect(data[0]! & 1).toBe(0);
+    // Root node header byte: bit 7 says suffix boundary, and the root is not
+    // one. Bit 6 says an index follows, which the root's 1,449 children earn.
+    expect(data[0]! & 0x80).toBe(0);
+    expect(data[0]! & 0x40).toBe(0x40);
   });
 
   it("returns a defensive copy (mutation does not affect lookups)", () => {
