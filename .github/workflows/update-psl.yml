@@ -273,8 +273,7 @@ jobs:
           # leaving the tag off main and breaking release-plz stacking. Open the
           # sync PR for the existing tag. If the prior run also failed at
           # `gh release create`, the release object (and crates.io publish) is
-          # missing — recreate it so the tag actually publishes. The downstream
-          # dispatch then runs from the shared step below (it also covers resync).
+          # missing — recreate it so the tag actually publishes.
           BRANCH="chore/psl-resync-${BASE_TAG}"
           # Re-attach the token to origin (checkout used persist-credentials: false).
           git remote set-url origin \
@@ -288,75 +287,3 @@ jobs:
             --body "Re-sync of released data ${BASE_TAG} that did not reach main in a prior run." \
             || true
           gh pr merge --auto --merge "$BRANCH"
-
-      # Notify downstream consumers that embed the PSL via this crate so they can
-      # rebuild + republish against the fresh data (off their own last release,
-      # not touching their unreleased code).
-      #
-      # The dispatch state is tracked INDEPENDENTLY of changed/resync via a
-      # per-version marker tag (`dispatched/v<ver>`): every run reconciles the
-      # latest release against the marker, so a dispatch lost to a transient
-      # crates.io/gh failure is retried on the next run (the marker is only
-      # written after a successful dispatch) — and an already-notified release is
-      # skipped, so no-op runs don't re-notify.
-      - name: Determine downstream dispatch need
-        id: dispatch
-        env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-        run: |
-          set -euo pipefail
-          ver=$(git tag --list 'v*' --sort=-version:refname | head -1 | sed 's/^v//')
-          echo "version=$ver" >> "$GITHUB_OUTPUT"
-          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/dispatched/v${ver}" >/dev/null 2>&1; then
-            echo "needed=false" >> "$GITHUB_OUTPUT"
-            echo "v${ver} already dispatched downstream"
-          else
-            echo "needed=true" >> "$GITHUB_OUTPUT"
-            echo "v${ver} not yet dispatched downstream"
-          fi
-
-      - name: Generate downstream token
-        id: downstream-token
-        if: steps.dispatch.outputs.needed == 'true'
-        uses: actions/create-github-app-token@v3
-        with:
-          app-id: ${{ secrets.RELEASER_APP_ID }}
-          private-key: ${{ secrets.RELEASER_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-          repositories: structured-email-address
-
-      - name: Trigger downstream rebuild (structured-email-address)
-        if: steps.dispatch.outputs.needed == 'true'
-        env:
-          DOWNSTREAM_TOKEN: ${{ steps.downstream-token.outputs.token }}
-          APP_TOKEN: ${{ steps.app-token.outputs.token }}
-          VER: ${{ steps.dispatch.outputs.version }}
-        run: |
-          set -euo pipefail
-          # The data release publishes asynchronously (release.yml, on the GitHub
-          # release). The downstream bumps its dependency on the PUBLISHED crate —
-          # not on this repo's main — so wait until the version is live on
-          # crates.io before dispatching, so the downstream can bump immediately.
-          for i in $(seq 1 30); do
-            if curl -fsS "https://index.crates.io/st/ru/structured-public-domains" \
-                 | grep -q "\"vers\":\"${VER}\""; then
-              echo "structured-public-domains v${VER} is live on crates.io"
-              break
-            fi
-            if [ "$i" -eq 30 ]; then
-              echo "timed out waiting for v${VER} on crates.io" >&2
-              exit 1
-            fi
-            echo "waiting for v${VER} on crates.io (attempt ${i})..."
-            sleep 10
-          done
-          GH_TOKEN="$DOWNSTREAM_TOKEN" gh api \
-            "repos/${GITHUB_REPOSITORY_OWNER}/structured-email-address/dispatches" \
-            -f event_type=psl-updated \
-            -F "client_payload[version]=${VER}" \
-            -F "client_payload[crate]=structured-public-domains"
-          # Record the marker only AFTER a successful dispatch, so a failure above
-          # leaves no marker and the next run retries.
-          SHA=$(GH_TOKEN="$APP_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/v${VER}" --jq '.object.sha')
-          GH_TOKEN="$APP_TOKEN" gh api "repos/${GITHUB_REPOSITORY}/git/refs" \
-            -f "ref=refs/tags/dispatched/v${VER}" -f "sha=${SHA}"
