@@ -26,7 +26,15 @@ permissions:
 jobs:
   auto-merge:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    # Both the author and the actor, not just the author. `synchronize` fires
+    # for any push to the pull request's branch, and the author stays
+    # dependabot[bot] no matter who pushed — so checking the author alone lets a
+    # maintainer add commits to an open Dependabot PR and have this job approve
+    # and auto-merge them with the App token, which is precisely the independent
+    # review that approval is supposed to represent.
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.actor == 'dependabot[bot]'
 
     steps:
       # Pinned to commit SHAs, not tags, because `pull_request_target` puts the
