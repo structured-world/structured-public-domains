@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.27](https://github.com/structured-world/structured-public-domains/compare/v0.0.26...v0.0.27) - 2026-09-02
+
+### Data
+
+PSL data update: +4 -5 domains.
+
+<details><summary>Added (4)</summary>
+
+```
+*.eth.limo
+*.eth.link
+canva-code.cn
+tmp.now
+```
+
+</details>
+
+<details><summary>Removed (5)</summary>
+
+```
+demo.datacenter.fi
+paas.datacenter.fi
+u2-local.xnbay.com
+u2.xnbay.com
+xnbay.com
+```
+
+</details>
+
+
 ## [0.0.26](https://github.com/structured-world/structured-public-domains/compare/v0.0.25...v0.0.26) - 2026-09-01
 
 ### Added
