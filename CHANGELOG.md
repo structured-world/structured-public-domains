@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.28](https://github.com/structured-world/structured-public-domains/compare/v0.0.27...v0.0.28) - 2026-09-03
+
+### Data
+
+PSL data update: +2 -0 domains.
+
+<details><summary>Added (2)</summary>
+
+```
+*.builtwithrocket.new
+rocketpreview.app
+```
+
+</details>
+
+
 ## [0.0.27](https://github.com/structured-world/structured-public-domains/compare/v0.0.26...v0.0.27) - 2026-09-02
 
 ### Data
