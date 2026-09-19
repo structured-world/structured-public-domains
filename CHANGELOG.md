@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.34](https://github.com/structured-world/structured-public-domains/compare/v0.0.33...v0.0.34) - 2026-09-19
+
+### Data
+
+PSL data update: +2 -2 domains.
+
+<details><summary>Added (2)</summary>
+
+```
+*.compute.herokuapp.com
+hosted-by-files.com
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+alpha-myqnapcloud.com
+dev-myqnapcloud.com
+```
+
+</details>
+
+
 ## [0.0.33](https://github.com/structured-world/structured-public-domains/compare/v0.0.32...v0.0.33) - 2026-09-09
 
 ### Data
