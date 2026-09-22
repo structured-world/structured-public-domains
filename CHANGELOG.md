@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.35](https://github.com/structured-world/structured-public-domains/compare/v0.0.34...v0.0.35) - 2026-09-22
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+*.azure.databricksapps.com
+aws-gov.databricksapps.us
+aws.databricksapps.com
+gcp.databricksapps.com
+surge.sh
+```
+
+</details>
+
+
 ## [0.0.34](https://github.com/structured-world/structured-public-domains/compare/v0.0.33...v0.0.34) - 2026-09-19
 
 ### Data
