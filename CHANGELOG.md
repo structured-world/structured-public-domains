@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.36](https://github.com/structured-world/structured-public-domains/compare/v0.0.35...v0.0.36) - 2026-09-24
+
+### Data
+
+PSL data update: +3 -0 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+iqhs.pl
+site.hosting-cluster.nl
+site.webhosting.be
+```
+
+</details>
+
+
 ## [0.0.35](https://github.com/structured-world/structured-public-domains/compare/v0.0.34...v0.0.35) - 2026-09-22
 
 ### Data
