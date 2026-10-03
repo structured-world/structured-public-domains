@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.38](https://github.com/structured-world/structured-public-domains/compare/v0.0.37...v0.0.38) - 2026-10-02
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+juniper
+```
+
+</details>
+
+
 ## [0.0.37](https://github.com/structured-world/structured-public-domains/compare/v0.0.36...v0.0.37) - 2026-09-25
 
 ### Data
