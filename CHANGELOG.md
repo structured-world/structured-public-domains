@@ -7,6 +7,84 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.39](https://github.com/structured-world/structured-public-domains/compare/v0.0.38...v0.0.39) - 2026-10-07
+
+### Data
+
+PSL data update: +30 -27 domains.
+
+<details><summary>Added (30)</summary>
+
+```
+*.ap-east-1.cs.amazonlightsail.com
+*.ap-northeast-1.cs.amazonlightsail.com
+*.ap-northeast-2.cs.amazonlightsail.com
+*.ap-south-1.cs.amazonlightsail.com
+*.ap-southeast-1.cs.amazonlightsail.com
+*.ap-southeast-2.cs.amazonlightsail.com
+*.ap-southeast-3.cs.amazonlightsail.com
+*.ap-southeast-5.cs.amazonlightsail.com
+*.ca-central-1.cs.amazonlightsail.com
+*.eu-central-1.cs.amazonlightsail.com
+*.eu-north-1.cs.amazonlightsail.com
+*.eu-south-2.cs.amazonlightsail.com
+*.eu-west-1.cs.amazonlightsail.com
+*.eu-west-2.cs.amazonlightsail.com
+*.eu-west-3.cs.amazonlightsail.com
+*.replit.dev
+*.sa-east-1.cs.amazonlightsail.com
+*.teams.replit.dev
+*.us-east-1.cs.amazonlightsail.com
+*.us-east-2.cs.amazonlightsail.com
+*.us-west-2.cs.amazonlightsail.com
+amazonlightsail.com
+ap-south-2.elasticbeanstalk.com
+ap-southeast-4.elasticbeanstalk.com
+ap-southeast-6.elasticbeanstalk.com
+auth.ap-east-2.amazoncognito.com
+auth.ap-southeast-6.amazoncognito.com
+ca-west-1.elasticbeanstalk.com
+eu-central-2.elasticbeanstalk.com
+retool.app
+```
+
+</details>
+
+<details><summary>Removed (27)</summary>
+
+```
+archer.replit.dev
+bones.replit.dev
+canary.replit.dev
+global.replit.dev
+hacker.replit.dev
+id.replit.dev
+janeway.replit.dev
+kim.replit.dev
+kira.replit.dev
+kirk.replit.dev
+odo.replit.dev
+paris.replit.dev
+picard.replit.dev
+pike.replit.dev
+prerelease.replit.dev
+reed.replit.dev
+replit.dev
+riker.replit.dev
+sisko.replit.dev
+spock.replit.dev
+staging.replit.dev
+sulu.replit.dev
+tarpit.replit.dev
+teams.replit.dev
+tucker.replit.dev
+wesley.replit.dev
+worf.replit.dev
+```
+
+</details>
+
+
 ## [0.0.38](https://github.com/structured-world/structured-public-domains/compare/v0.0.37...v0.0.38) - 2026-10-02
 
 ### Data
