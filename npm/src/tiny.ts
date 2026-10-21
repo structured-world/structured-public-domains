@@ -292,27 +292,49 @@ function idbOpen(idb: IDBFactory): Promise<IDBDatabase> {
 }
 
 /**
+ * How long load() waits on one cache operation. An open has no deadline of its
+ * own: it queues behind any blocked upgrade or deletion of the database, and
+ * some engines never answer at all, so without this a cache could hold load()
+ * off the network indefinitely. Past it the operation counts as a miss.
+ */
+const IDB_DEADLINE_MS = 1000;
+
+/**
  * Run one request in its own transaction and resolve with its result once the
  * transaction commits, so a write is durable before load() reports success.
  * The connection is closed afterwards to never hold up another tab's upgrade.
+ * An operation that outlives the deadline still runs to completion and closes
+ * its connection; only load() stops waiting for it.
  */
-async function idbRun<T>(
+function idbRun<T>(
   idb: IDBFactory,
   mode: IDBTransactionMode,
   op: (store: IDBObjectStore) => IDBRequest<T>,
 ): Promise<T> {
-  const db = await idbOpen(idb);
-  try {
-    return await new Promise<T>((resolve, reject) => {
-      const tx = db.transaction(IDB_STORE, mode);
-      const req = op(tx.objectStore(IDB_STORE));
-      tx.oncomplete = () => resolve(req.result);
-      tx.onerror = () => reject(tx.error ?? req.error ?? new Error("IndexedDB request failed"));
-      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
-    });
-  } finally {
-    db.close();
-  }
+  const work = idbOpen(idb).then(async (db) => {
+    try {
+      return await new Promise<T>((resolve, reject) => {
+        const tx = db.transaction(IDB_STORE, mode);
+        const req = op(tx.objectStore(IDB_STORE));
+        tx.oncomplete = () => resolve(req.result);
+        tx.onerror = () => reject(tx.error ?? req.error ?? new Error("IndexedDB request failed"));
+        tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+      });
+    } finally {
+      db.close();
+    }
+  });
+  return withDeadline(work, IDB_DEADLINE_MS);
+}
+
+function withDeadline<T>(work: Promise<T>, ms: number): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`IndexedDB did not answer within ${ms}ms`)), ms);
+  });
+  // Once the deadline wins nobody awaits `work`; its late failure is not news.
+  work.catch(() => undefined);
+  return Promise.race([work, deadline]).finally(() => clearTimeout(timer));
 }
 
 async function readIdbCache(idb: IDBFactory, url: string, ttlMs: number): Promise<Uint8Array | undefined> {

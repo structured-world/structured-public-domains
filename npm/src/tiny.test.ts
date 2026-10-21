@@ -276,6 +276,36 @@ describe("tiny cache (IndexedDB)", () => {
     expect(typeof stored.cachedAt).toBe("number");
   });
 
+  it("does not wait on an open queued behind a blocked database deletion", async () => {
+    // Another connection keeps the database open and ignores `versionchange`,
+    // so a deletion requested meanwhile is blocked, and any open after it is
+    // queued behind the deletion with no deadline of its own.
+    const holder = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = idb.open("structured-public-domains", 1);
+      open.onupgradeneeded = () => open.result.createObjectStore("psl");
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    const deletion = idb.deleteDatabase("structured-public-domains");
+    try {
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      const outcome = await Promise.race([
+        tiny.load({ url: SRC, fetch }).then(() => "loaded"),
+        new Promise((r) => setTimeout(() => r("stalled"), 4000)),
+      ]);
+      expect(outcome).toBe("loaded");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(tiny.isKnownSuffix("example.com")).toBe(true);
+    } finally {
+      holder.close();
+      await new Promise((resolve) => {
+        deletion.onsuccess = resolve;
+        deletion.onerror = resolve;
+      });
+    }
+  }, 10_000);
+
   it("still loads from the network when IndexedDB cannot be opened", async () => {
     // Shape of a context where the API exists but refuses access (e.g. storage
     // blocked by the user): open() throws synchronously.
