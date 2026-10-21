@@ -134,6 +134,32 @@ describe("tiny cache (Node file)", () => {
     expect(fetch2).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps only the in-memory copy in a runtime with neither IndexedDB nor Node", async () => {
+    // The module decides "is Node" when it is imported, so hide the marker for
+    // just that moment; this is the shape of a worker runtime without storage.
+    const outsideNode = async () => {
+      const versions = Object.getOwnPropertyDescriptor(process, "versions")!;
+      Object.defineProperty(process, "versions", { ...versions, value: { ...process.versions, node: undefined } });
+      try {
+        return await freshTiny();
+      } finally {
+        Object.defineProperty(process, "versions", versions);
+      }
+    };
+
+    const first = await outsideNode();
+    const fetch1 = mockFetch();
+    await first.load({ fetch: fetch1, cacheDir: dir });
+    expect(fetch1).toHaveBeenCalledTimes(1);
+    expect(existsSync(dir)).toBe(false);
+
+    const second = await outsideNode();
+    const fetch2 = mockFetch();
+    await second.load({ fetch: fetch2, cacheDir: dir });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(second.isKnownSuffix("example.com")).toBe(true);
+  });
+
   it("treats a zero TTL as expired even when the file's mtime is ahead of the clock", async () => {
     const first = await freshTiny();
     await first.load({ fetch: mockFetch(), cacheDir: dir });
@@ -371,6 +397,23 @@ describe("tiny cache (IndexedDB)", () => {
       await tiny.load({ url: SRC, fetch });
       expect(fetch).toHaveBeenCalledTimes(1);
     }
+  });
+
+  it("resolves against the document base, which <base href> can move off the page URL", async () => {
+    // Same page URL, different <base>: fetch() loads different files, so the
+    // keys must differ too.
+    vi.stubGlobal("location", { href: "https://site.test/app/page.html" });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-a/" });
+    const first = await freshTiny();
+    await first.load({ url: "psl.bin", fetch: mockFetch() });
+
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-b/" });
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: "psl.bin", fetch: fetch2 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(await idbPeek(idb, "https://site.test/rules-a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/rules-b/psl.bin")).toBeDefined();
   });
 
   it("uses a URL that does not resolve against the page as given", async () => {

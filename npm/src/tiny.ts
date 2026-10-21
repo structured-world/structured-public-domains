@@ -119,19 +119,20 @@ async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
 async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]> {
   const url = opts.url ?? DEFAULT_PSL_URL;
   const ttlMs = opts.cacheTtlMs ?? DEFAULT_TTL_MS;
-  const useCache = opts.cache ?? true;
+  const store = (opts.cache ?? true) ? cacheStore(url, opts.cacheDir) : undefined;
   const doFetch = opts.fetch ?? globalThis.fetch;
 
   // Try the cache, but parse it here: a fresh-but-corrupt blob must not break
   // load() permanently — discard it and fall through to the network instead.
-  if (useCache && opts.force !== true) {
-    const cached = await readCache(url, ttlMs, opts.cacheDir);
+  // A cache that fails to answer is a miss.
+  if (store !== undefined && opts.force !== true) {
+    const cached = await store.read(ttlMs).catch(() => undefined);
     if (cached !== undefined) {
       try {
         validateTrie(cached);
         return [cached, parseTrie(cached)];
       } catch {
-        await deleteCache(url, opts.cacheDir).catch(() => undefined);
+        await store.remove().catch(() => undefined);
       }
     }
   }
@@ -143,7 +144,7 @@ async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]>
   // Validate before caching so a bad network body is never persisted.
   validateTrie(data);
   const trie = parseTrie(data);
-  if (useCache) await writeCache(url, data, opts.cacheDir).catch(() => undefined);
+  if (store !== undefined) await store.write(data).catch(() => undefined);
   return [data, trie];
 }
 
@@ -217,46 +218,61 @@ function idbFactory(): IDBFactory | undefined {
 
 /**
  * The IndexedDB key for `url`: the resource it names, not how it is spelled.
- * fetch() resolves a relative URL against the document or worker, so two pages
- * loading "psl.bin" from different directories fetch different files; keyed by
- * the raw string they would share one entry and one page would get the other's
- * rules. Outside a page there is no base and the URL is used as given.
+ * Two pages loading "psl.bin" from different bases fetch different files;
+ * keyed by the raw string they would share one entry and one page would get
+ * the other's rules. Outside a page there is no base and the URL is used as given.
  */
 function idbKey(url: string): string {
-  if (typeof location === "undefined") return url;
+  // fetch() parses the URL against the API base URL (Fetch Standard, Request
+  // constructor step 5.1): for a window that is the document's base URL, which
+  // <base href> moves off the page URL (HTML 2.4.1); for a worker, its location.
+  const base =
+    typeof document !== "undefined"
+      ? document.baseURI
+      : typeof location !== "undefined"
+        ? location.href
+        : undefined;
+  if (base === undefined) return url;
   try {
-    return new URL(url, location.href).href;
+    return new URL(url, base).href;
   } catch {
     return url;
   }
 }
 
-async function readCache(url: string, ttlMs: number, cacheDir?: string): Promise<Uint8Array | undefined> {
-  try {
-    const idb = idbFactory();
-    if (idb !== undefined) return await readIdbCache(idb, idbKey(url), ttlMs);
-    return isNode ? await readNodeCache(url, ttlMs, cacheDir) : undefined;
-  } catch {
-    return undefined;
-  }
+/** Where one load() keeps the blob for `url`. */
+interface CacheStore {
+  /** The cached blob if younger than `ttlMs`, else undefined. */
+  read(ttlMs: number): Promise<Uint8Array | undefined>;
+  write(data: Uint8Array): Promise<void>;
+  /** Drop a stale or corrupt entry so the next load() re-fetches cleanly. */
+  remove(): Promise<void>;
 }
 
-async function writeCache(url: string, data: Uint8Array, cacheDir?: string): Promise<void> {
-  const idb = idbFactory();
-  if (idb !== undefined) await writeIdbCache(idb, idbKey(url), data);
-  else if (isNode) await writeNodeCache(url, data, cacheDir);
-}
-
-/** Remove a stale/corrupt cache entry so the next load() re-fetches cleanly. */
-async function deleteCache(url: string, cacheDir?: string): Promise<void> {
+/**
+ * Pick the backend once per load(): IndexedDB wherever it exists, else the
+ * Node temp file, else none, leaving the in-process singleton as the only
+ * cache. Reads, writes and removals of one load() all go to the same place.
+ */
+function cacheStore(url: string, cacheDir?: string): CacheStore | undefined {
   const idb = idbFactory();
   if (idb !== undefined) {
     const key = idbKey(url);
-    await idbRun(idb, "readwrite", (store) => store.delete(key));
-  } else if (isNode) {
-    const { fs, file } = await nodeCache(url, cacheDir);
-    fs.rmSync(file, { force: true });
+    return {
+      read: (ttlMs) => readIdbCache(idb, key, ttlMs),
+      write: (data) => writeIdbCache(idb, key, data),
+      remove: () => idbRun(idb, "readwrite", (store) => store.delete(key)),
+    };
   }
+  if (!isNode) return undefined;
+  return {
+    read: (ttlMs) => readNodeCache(url, ttlMs, cacheDir),
+    write: (data) => writeNodeCache(url, data, cacheDir),
+    remove: async () => {
+      const { fs, file } = await nodeCache(url, cacheDir);
+      fs.rmSync(file, { force: true });
+    },
+  };
 }
 
 // Import Node builtins through a variable specifier so bundlers cannot statically
@@ -307,7 +323,7 @@ function idbOpen(idb: IDBFactory): Promise<IDBDatabase> {
     const req = idb.open(IDB_NAME, 1);
     req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
+    req.onerror = () => reject(req.error);
   });
 }
 
@@ -337,8 +353,9 @@ function idbRun<T>(
         const tx = db.transaction(IDB_STORE, mode);
         const req = op(tx.objectStore(IDB_STORE));
         tx.oncomplete = () => resolve(req.result);
-        tx.onerror = () => reject(tx.error ?? req.error ?? new Error("IndexedDB request failed"));
-        tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+        // A failed request aborts its transaction and leaves the cause in
+        // tx.error, so abort is the one outcome to handle besides completion.
+        tx.onabort = () => reject(tx.error);
       });
     } finally {
       db.close();
