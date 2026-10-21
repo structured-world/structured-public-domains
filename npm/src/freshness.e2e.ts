@@ -29,10 +29,20 @@ const HISTORY_PATH = "public_suffix_list.dat";
 // Daily update at 06:00 UTC, then release, npm publish and the CDN range cache.
 // A source change older than two days that is still missing is a broken chain.
 // PSL_STALE_AFTER_HOURS=0 turns any difference into a failure.
-const STALE_AFTER_HOURS = Number(process.env.PSL_STALE_AFTER_HOURS ?? 48);
+// Unset or empty keeps the default: Number("") is 0, which would silently
+// turn the window off instead of reporting the mistake.
+const rawStale = process.env.PSL_STALE_AFTER_HOURS?.trim();
+const STALE_AFTER_HOURS = rawStale ? Number(rawStale) : 48;
+if (!Number.isFinite(STALE_AFTER_HOURS) || STALE_AFTER_HOURS < 0) {
+  throw new Error(`PSL_STALE_AFTER_HOURS must be a non-negative number of hours, got "${rawStale}"`);
+}
+
+// Per request, so one hung endpoint fails in its own line of the report
+// instead of running out the whole test's timeout and losing the verdict.
+const REQUEST_TIMEOUT_MS = 15_000;
 
 async function fetchOk(url: string, init?: RequestInit): Promise<Response> {
-  const res = await fetch(url, init);
+  const res = await fetch(url, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS), ...init });
   if (!res.ok) throw new Error(`${url}: ${res.status} ${res.statusText}`);
   return res;
 }
