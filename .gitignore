@@ -1,8 +1,9 @@
 /target
 
-# npm package: build output, deps, generated data, and the README mirrored
-# from the repo root at build time.
+# npm package: build output, deps, coverage, generated data, and the README
+# mirrored from the repo root at build time.
 /npm/dist
+/npm/coverage
 /npm/node_modules
 /npm/src/psl-data.cjs
 /npm/README.md

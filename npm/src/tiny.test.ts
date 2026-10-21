@@ -1,11 +1,12 @@
 // Tests for the runtime-fetched "tiny" entry. The PSL bytes are injected via a
 // mock fetch reading the real src/psl.bin, so results must match the embedded
 // build exactly. Module state is reset between tests via vitest module isolation.
-import { readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { IDBFactory } from "fake-indexeddb";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const PSL_BIN = readFileSync(join(fileURLToPath(import.meta.url), "..", "..", "..", "src", "psl.bin"));
@@ -133,6 +134,61 @@ describe("tiny cache (Node file)", () => {
     expect(fetch2).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps only the in-memory copy in a runtime with neither IndexedDB nor Node", async () => {
+    // The module decides "is Node" when it is imported, so hide the marker for
+    // just that moment; this is the shape of a worker runtime without storage.
+    const outsideNode = async () => {
+      const versions = Object.getOwnPropertyDescriptor(process, "versions")!;
+      Object.defineProperty(process, "versions", { ...versions, value: { ...process.versions, node: undefined } });
+      try {
+        return await freshTiny();
+      } finally {
+        Object.defineProperty(process, "versions", versions);
+      }
+    };
+
+    const first = await outsideNode();
+    const fetch1 = mockFetch();
+    await first.load({ fetch: fetch1, cacheDir: dir });
+    expect(fetch1).toHaveBeenCalledTimes(1);
+    expect(existsSync(dir)).toBe(false);
+
+    const second = await outsideNode();
+    const fetch2 = mockFetch();
+    await second.load({ fetch: fetch2, cacheDir: dir });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(second.isKnownSuffix("example.com")).toBe(true);
+  });
+
+  it("treats a zero TTL as expired even when the file's mtime is ahead of the clock", async () => {
+    const first = await freshTiny();
+    await first.load({ fetch: mockFetch(), cacheDir: dir });
+    // mtime carries sub-millisecond precision that Date.now() drops, and a
+    // filesystem clock can run ahead; either puts a fresh file "in the future".
+    const ahead = new Date(Date.now() + 1000);
+    for (const f of readdirSync(dir)) utimesSync(join(dir, f), ahead, ahead);
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ fetch: fetch2, cacheDir: dir, cacheTtlMs: 0 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a file stamped in the future as stale under any TTL", async () => {
+    // Written while the clock ran a day ahead and read after it was corrected:
+    // its age is negative, and without this rule it would stay "fresh" for the
+    // whole skew on top of the TTL.
+    const first = await freshTiny();
+    await first.load({ fetch: mockFetch(), cacheDir: dir });
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    for (const f of readdirSync(dir)) utimesSync(join(dir, f), future, future);
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ fetch: fetch2, cacheDir: dir });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
   it("force re-fetches even with a fresh cache", async () => {
     const first = await freshTiny();
     const fetch1 = mockFetch();
@@ -142,6 +198,306 @@ describe("tiny cache (Node file)", () => {
     const fetch2 = mockFetch();
     await second.load({ fetch: fetch2, cacheDir: dir, force: true });
     expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+});
+
+/** Put a raw value under `url` in the tiny cache's IndexedDB store. */
+function idbSeed(idb: IDBFactory, url: string, value: unknown): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const open = idb.open("structured-public-domains", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("psl");
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const tx = db.transaction("psl", "readwrite");
+      tx.objectStore("psl").put(value, url);
+      tx.oncomplete = () => {
+        db.close();
+        resolve();
+      };
+      tx.onerror = () => reject(tx.error);
+    };
+  });
+}
+
+/** Read the raw value stored under `url`, or undefined when absent. */
+function idbPeek(idb: IDBFactory, url: string): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const open = idb.open("structured-public-domains", 1);
+    open.onupgradeneeded = () => open.result.createObjectStore("psl");
+    open.onerror = () => reject(open.error);
+    open.onsuccess = () => {
+      const db = open.result;
+      const req = db.transaction("psl", "readonly").objectStore("psl").get(url);
+      req.onsuccess = () => {
+        db.close();
+        resolve(req.result);
+      };
+      req.onerror = () => reject(req.error);
+    };
+  });
+}
+
+// IndexedDB is the browser cache, and it is what the tiny entry picks whenever
+// the global exists. A fresh fake factory per test keeps the stores apart; the
+// Node file cache must stay untouched while IndexedDB is in charge.
+describe("tiny cache (IndexedDB)", () => {
+  const SRC = "https://psl.test/psl.bin";
+  let idb: IDBFactory;
+  let dir: string;
+  beforeEach(() => {
+    idb = new IDBFactory();
+    vi.stubGlobal("indexedDB", idb);
+    dir = uniqueCacheDir();
+  });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("serves a fresh module instance from IndexedDB without fetching", async () => {
+    const first = await freshTiny();
+    const fetch1 = mockFetch();
+    await first.load({ url: SRC, fetch: fetch1, cacheDir: dir });
+    expect(fetch1).toHaveBeenCalledTimes(1);
+    expect(existsSync(dir)).toBe(false);
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: SRC, fetch: fetch2, cacheDir: dir });
+    expect(fetch2).toHaveBeenCalledTimes(0);
+    expect(second.lookup("www.example.co.uk")?.registrableDomain).toBe("example.co.uk");
+    expect(second.pslData()).toEqual(new Uint8Array(PSL_BIN));
+  });
+
+  it("keys entries by URL", async () => {
+    const first = await freshTiny();
+    await first.load({ url: SRC, fetch: mockFetch() });
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: `${SRC}?mirror`, fetch: fetch2 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
+  it("keys a relative URL by the resource it resolves to, not by its spelling", async () => {
+    // Pages in different directories that both load "psl.bin" fetch different
+    // files; sharing one entry would hand the second page the first one's rules.
+    vi.stubGlobal("location", { href: "https://site.test/a/page.html" });
+    const first = await freshTiny();
+    await first.load({ url: "psl.bin", fetch: mockFetch() });
+
+    vi.stubGlobal("location", { href: "https://site.test/b/page.html" });
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: "psl.bin", fetch: fetch2 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(await idbPeek(idb, "https://site.test/a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/b/psl.bin")).toBeDefined();
+
+    // The same page again is a hit on its own entry.
+    const third = await freshTiny();
+    const fetch3 = mockFetch();
+    await third.load({ url: "psl.bin", fetch: fetch3 });
+    expect(fetch3).toHaveBeenCalledTimes(0);
+  });
+
+  it("re-fetches when the entry is older than the TTL", async () => {
+    const first = await freshTiny();
+    await first.load({ url: SRC, fetch: mockFetch() });
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: SRC, fetch: fetch2, cacheTtlMs: 0 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
+  it("force re-fetches even with a fresh entry", async () => {
+    const first = await freshTiny();
+    await first.load({ url: SRC, fetch: mockFetch() });
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: SRC, fetch: fetch2, force: true });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not persist anything when the cache is disabled", async () => {
+    const tiny = await freshTiny();
+    await tiny.load({ url: SRC, fetch: mockFetch(), cache: false });
+    expect(await idbPeek(idb, SRC)).toBeUndefined();
+  });
+
+  it("replaces a fresh but corrupt entry with the fetched trie", async () => {
+    // Fresh timestamp, so only validation can reject it.
+    await idbSeed(idb, SRC, { bytes: new TextEncoder().encode("not a trie"), cachedAt: Date.now() });
+
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(tiny.lookup("example.com")?.suffix).toBe("com");
+    const stored = (await idbPeek(idb, SRC)) as { bytes: Uint8Array };
+    expect(stored.bytes).toEqual(new Uint8Array(PSL_BIN));
+  });
+
+  it("treats a value of another shape as a miss and overwrites it", async () => {
+    await idbSeed(idb, SRC, "left by something else");
+
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await tiny.load({ url: SRC, fetch });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const stored = (await idbPeek(idb, SRC)) as { bytes: Uint8Array; cachedAt: number };
+    expect(stored.bytes).toEqual(new Uint8Array(PSL_BIN));
+    expect(typeof stored.cachedAt).toBe("number");
+  });
+
+  it("does not wait on an open queued behind a blocked database deletion", async () => {
+    // Another connection keeps the database open and ignores `versionchange`,
+    // so a deletion requested meanwhile is blocked, and any open after it is
+    // queued behind the deletion with no deadline of its own.
+    const holder = await new Promise<IDBDatabase>((resolve, reject) => {
+      const open = idb.open("structured-public-domains", 1);
+      open.onupgradeneeded = () => open.result.createObjectStore("psl");
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    const deletion = idb.deleteDatabase("structured-public-domains");
+    try {
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      const outcome = await Promise.race([
+        tiny.load({ url: SRC, fetch }).then(() => "loaded"),
+        new Promise((r) => setTimeout(() => r("stalled"), 4000)),
+      ]);
+      expect(outcome).toBe("loaded");
+      expect(fetch).toHaveBeenCalledTimes(1);
+      expect(tiny.isKnownSuffix("example.com")).toBe(true);
+    } finally {
+      holder.close();
+      await new Promise((resolve) => {
+        deletion.onsuccess = resolve;
+        deletion.onerror = resolve;
+      });
+    }
+  }, 10_000);
+
+  it("treats a database a newer release upgraded as a miss, not a failure", async () => {
+    // A later package version may raise the schema version; opening it at our
+    // version then fails with VersionError, which must only cost a fetch.
+    await new Promise<void>((resolve, reject) => {
+      const open = idb.open("structured-public-domains", 2);
+      open.onupgradeneeded = () => open.result.createObjectStore("psl");
+      open.onsuccess = () => {
+        open.result.close();
+        resolve();
+      };
+      open.onerror = () => reject(open.error);
+    });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an entry stamped in the future as stale under any TTL", async () => {
+    // Written while the device clock ran ahead; after the correction its age is
+    // negative and it would otherwise stay "fresh" for the skew plus the TTL.
+    await idbSeed(idb, SRC, { bytes: new Uint8Array(PSL_BIN), cachedAt: Date.now() + 24 * 60 * 60 * 1000 });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await tiny.load({ url: SRC, fetch });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads from the network when merely touching indexedDB throws", async () => {
+    // Some runtimes deny storage by throwing from the global's getter itself.
+    vi.unstubAllGlobals();
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      get() {
+        throw new DOMException("storage is blocked", "SecurityError");
+      },
+    });
+    try {
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (globalThis as { indexedDB?: unknown }).indexedDB;
+    }
+  });
+
+  it("fetches and caches the URL as resolved when load() started", async () => {
+    // The base can move while the cache read is pending (<base href> edited,
+    // history.pushState). Resolving once keeps the fetched resource and the key
+    // it is stored under the same; otherwise B's rules land under A's key.
+    vi.stubGlobal("location", { href: "https://site.test/app/page.html" });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-a/" });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    const pending = tiny.load({ url: "psl.bin", fetch });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-b/" });
+    await pending;
+    expect(fetch).toHaveBeenCalledWith("https://site.test/rules-a/psl.bin");
+    expect(await idbPeek(idb, "https://site.test/rules-a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/rules-b/psl.bin")).toBeUndefined();
+  });
+
+  it("treats an entry whose bytes or timestamp have the wrong type as a miss", async () => {
+    for (const entry of [
+      { bytes: Array.from(PSL_BIN), cachedAt: Date.now() },
+      { bytes: new Uint8Array(PSL_BIN), cachedAt: String(Date.now()) },
+      { bytes: new Uint8Array(PSL_BIN), cachedAt: Number.NaN },
+    ]) {
+      await idbSeed(idb, SRC, entry);
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      await tiny.load({ url: SRC, fetch });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("resolves against the document base, which <base href> can move off the page URL", async () => {
+    // Same page URL, different <base>: fetch() loads different files, so the
+    // keys must differ too.
+    vi.stubGlobal("location", { href: "https://site.test/app/page.html" });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-a/" });
+    const first = await freshTiny();
+    await first.load({ url: "psl.bin", fetch: mockFetch() });
+
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-b/" });
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: "psl.bin", fetch: fetch2 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(await idbPeek(idb, "https://site.test/rules-a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/rules-b/psl.bin")).toBeDefined();
+  });
+
+  it("uses a URL that does not resolve against the page as given", async () => {
+    vi.stubGlobal("location", { href: "https://site.test/a/page.html" });
+    const unresolvable = "http://[bad";
+    const tiny = await freshTiny();
+    await tiny.load({ url: unresolvable, fetch: mockFetch() });
+    expect(await idbPeek(idb, unresolvable)).toBeDefined();
+  });
+
+  it("still loads from the network when IndexedDB cannot be opened", async () => {
+    // Shape of a context where the API exists but refuses access (e.g. storage
+    // blocked by the user): open() throws synchronously.
+    vi.stubGlobal("indexedDB", {
+      open: () => {
+        throw new DOMException("access denied", "SecurityError");
+      },
+    });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(tiny.isKnownSuffix("example.com")).toBe(true);
   });
 });
 
@@ -323,6 +679,16 @@ describe("tiny error handling", () => {
     const tiny = await freshTiny();
     const badFetch = vi.fn(async () => ({ ok: false, status: 503, statusText: "Service Unavailable" })) as unknown as typeof fetch;
     await expect(tiny.load({ fetch: badFetch, cache: false })).rejects.toThrow(/503/);
+  });
+
+  it("says how to fix it when the runtime has no fetch", async () => {
+    vi.stubGlobal("fetch", undefined);
+    try {
+      const tiny = await freshTiny();
+      await expect(tiny.load({ cache: false })).rejects.toThrow(/pass `fetch` in LoadOptions/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("throws on an implausibly small body", async () => {

@@ -144,7 +144,13 @@ jobs:
         run: npm run typecheck
       - name: Unit tests
         working-directory: npm
-        run: npm test
+        run: npm test -- --coverage
+      - uses: codecov/codecov-action@v7
+        with:
+          files: npm/coverage/lcov.info
+          flags: npm
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
       - name: Build (ESM + CJS + dts)
         working-directory: npm
         run: npm run build
