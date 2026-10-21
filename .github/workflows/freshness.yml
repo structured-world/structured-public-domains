@@ -1,8 +1,8 @@
 name: PSL Freshness
 
 # Checks the trie `/tiny` downloads by default against the live Public Suffix
-# List and fails when it is still behind a source change older than two days,
-# i.e. when the update -> release -> npm -> CDN chain has stopped somewhere.
+# List and fails when it still misses a source change made more than two days
+# ago, i.e. when the update -> release -> npm -> CDN chain has stopped somewhere.
 # Scheduled six hours after `update-psl.yml` so a normal daily run has landed.
 on:
   schedule:
@@ -29,3 +29,6 @@ jobs:
       - name: Probe
         working-directory: npm
         run: npm run test:e2e
+        env:
+          # Reads publicsuffix/list history; anonymous calls share a per-IP budget.
+          GITHUB_TOKEN: ${{ github.token }}
