@@ -174,6 +174,21 @@ describe("tiny cache (Node file)", () => {
     expect(fetch2).toHaveBeenCalledTimes(1);
   });
 
+  it("treats a file stamped in the future as stale under any TTL", async () => {
+    // Written while the clock ran a day ahead and read after it was corrected:
+    // its age is negative, and without this rule it would stay "fresh" for the
+    // whole skew on top of the TTL.
+    const first = await freshTiny();
+    await first.load({ fetch: mockFetch(), cacheDir: dir });
+    const future = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    for (const f of readdirSync(dir)) utimesSync(join(dir, f), future, future);
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ fetch: fetch2, cacheDir: dir });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
   it("force re-fetches even with a fresh cache", async () => {
     const first = await freshTiny();
     const fetch1 = mockFetch();
@@ -386,10 +401,56 @@ describe("tiny cache (IndexedDB)", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("treats an entry stamped in the future as stale under any TTL", async () => {
+    // Written while the device clock ran ahead; after the correction its age is
+    // negative and it would otherwise stay "fresh" for the skew plus the TTL.
+    await idbSeed(idb, SRC, { bytes: new Uint8Array(PSL_BIN), cachedAt: Date.now() + 24 * 60 * 60 * 1000 });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await tiny.load({ url: SRC, fetch });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads from the network when merely touching indexedDB throws", async () => {
+    // Some runtimes deny storage by throwing from the global's getter itself.
+    vi.unstubAllGlobals();
+    Object.defineProperty(globalThis, "indexedDB", {
+      configurable: true,
+      get() {
+        throw new DOMException("storage is blocked", "SecurityError");
+      },
+    });
+    try {
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+      expect(fetch).toHaveBeenCalledTimes(1);
+    } finally {
+      delete (globalThis as { indexedDB?: unknown }).indexedDB;
+    }
+  });
+
+  it("fetches and caches the URL as resolved when load() started", async () => {
+    // The base can move while the cache read is pending (<base href> edited,
+    // history.pushState). Resolving once keeps the fetched resource and the key
+    // it is stored under the same; otherwise B's rules land under A's key.
+    vi.stubGlobal("location", { href: "https://site.test/app/page.html" });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-a/" });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    const pending = tiny.load({ url: "psl.bin", fetch });
+    vi.stubGlobal("document", { baseURI: "https://site.test/rules-b/" });
+    await pending;
+    expect(fetch).toHaveBeenCalledWith("https://site.test/rules-a/psl.bin");
+    expect(await idbPeek(idb, "https://site.test/rules-a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/rules-b/psl.bin")).toBeUndefined();
+  });
+
   it("treats an entry whose bytes or timestamp have the wrong type as a miss", async () => {
     for (const entry of [
       { bytes: Array.from(PSL_BIN), cachedAt: Date.now() },
       { bytes: new Uint8Array(PSL_BIN), cachedAt: String(Date.now()) },
+      { bytes: new Uint8Array(PSL_BIN), cachedAt: Number.NaN },
     ]) {
       await idbSeed(idb, SRC, entry);
       const tiny = await freshTiny();

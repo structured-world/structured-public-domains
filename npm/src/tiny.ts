@@ -117,7 +117,9 @@ async function doLoad(opts: LoadOptions, gen: number): Promise<void> {
 }
 
 async function fetchAndParse(opts: LoadOptions): Promise<[Uint8Array, TrieNode]> {
-  const url = opts.url ?? DEFAULT_PSL_URL;
+  // Resolved once, before anything awaits: the resource fetched and the key it
+  // is cached under must name the same file even if the base moves meanwhile.
+  const url = resolveUrl(opts.url ?? DEFAULT_PSL_URL);
   const ttlMs = opts.cacheTtlMs ?? DEFAULT_TTL_MS;
   const store = (opts.cache ?? true) ? cacheStore(url, opts.cacheDir) : undefined;
   const doFetch = opts.fetch ?? globalThis.fetch;
@@ -210,6 +212,17 @@ function cacheKey(url: string): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
+/**
+ * Whether an entry stamped at `stampedAt` (epoch ms) is past `ttlMs`. A stamp
+ * in the future cannot come from an honest write, only from a clock that ran
+ * ahead and was corrected since; trusting it would keep the entry fresh for the
+ * whole skew on top of the TTL, so it counts as stale.
+ */
+function isStale(stampedAt: number, ttlMs: number): boolean {
+  const now = Date.now();
+  return !Number.isFinite(stampedAt) || stampedAt > now || now - stampedAt >= ttlMs;
+}
+
 // IndexedDB is looked up per call rather than captured at import, so a runtime
 // that installs it late (or a test that stubs it) is honoured.
 function idbFactory(): IDBFactory | undefined {
@@ -217,12 +230,12 @@ function idbFactory(): IDBFactory | undefined {
 }
 
 /**
- * The IndexedDB key for `url`: the resource it names, not how it is spelled.
- * Two pages loading "psl.bin" from different bases fetch different files;
- * keyed by the raw string they would share one entry and one page would get
+ * `url` as the absolute address fetch() would load right now, used both to
+ * fetch and as the cache key. Keyed by the raw string, two pages loading
+ * "psl.bin" from different bases would share one entry and one page would get
  * the other's rules. Outside a page there is no base and the URL is used as given.
  */
-function idbKey(url: string): string {
+function resolveUrl(url: string): string {
   // fetch() parses the URL against the API base URL (Fetch Standard, Request
   // constructor step 5.1): for a window that is the document's base URL, which
   // <base href> moves off the page URL (HTML 2.4.1); for a worker, its location.
@@ -255,13 +268,19 @@ interface CacheStore {
  * cache. Reads, writes and removals of one load() all go to the same place.
  */
 function cacheStore(url: string, cacheDir?: string): CacheStore | undefined {
-  const idb = idbFactory();
+  let idb: IDBFactory | undefined;
+  try {
+    idb = idbFactory();
+  } catch {
+    // Some runtimes deny storage by throwing from the global itself; that is
+    // a runtime without a cache, not a reason to skip the network.
+    return undefined;
+  }
   if (idb !== undefined) {
-    const key = idbKey(url);
     return {
-      read: (ttlMs) => readIdbCache(idb, key, ttlMs),
-      write: (data) => writeIdbCache(idb, key, data),
-      remove: () => idbRun(idb, "readwrite", (store) => store.delete(key)),
+      read: (ttlMs) => readIdbCache(idb, url, ttlMs),
+      write: (data) => writeIdbCache(idb, url, data),
+      remove: () => idbRun(idb, "readwrite", (store) => store.delete(url)),
     };
   }
   if (!isNode) return undefined;
@@ -292,10 +311,7 @@ async function nodeCache(url: string, cacheDir?: string) {
 async function readNodeCache(url: string, ttlMs: number, cacheDir?: string): Promise<Uint8Array | undefined> {
   const { fs, file } = await nodeCache(url, cacheDir);
   const stat = fs.statSync(file);
-  // An mtime can sit ahead of Date.now(): it keeps the sub-millisecond part the
-  // clock drops, and a filesystem clock can run ahead. Age never goes below 0,
-  // so a zero TTL means expired rather than "written in the future".
-  if (Math.max(0, Date.now() - stat.mtimeMs) >= ttlMs) return undefined;
+  if (isStale(Math.floor(stat.mtimeMs), ttlMs)) return undefined;
   return new Uint8Array(fs.readFileSync(file));
 }
 
@@ -381,7 +397,7 @@ async function readIdbCache(idb: IDBFactory, url: string, ttlMs: number): Promis
   if (typeof entry !== "object" || entry === null) return undefined;
   const { bytes, cachedAt } = entry as Partial<IdbEntry>;
   if (!(bytes instanceof Uint8Array) || typeof cachedAt !== "number") return undefined;
-  if (!Number.isFinite(cachedAt) || Date.now() - cachedAt >= ttlMs) return undefined;
+  if (isStale(cachedAt, ttlMs)) return undefined;
   return bytes;
 }
 
