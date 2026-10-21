@@ -1,0 +1,31 @@
+name: PSL Freshness
+
+# Checks the trie `/tiny` downloads by default against the live Public Suffix
+# List and fails when it is still behind a source change older than two days,
+# i.e. when the update -> release -> npm -> CDN chain has stopped somewhere.
+# Scheduled six hours after `update-psl.yml` so a normal daily run has landed.
+on:
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  freshness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+
+      - name: Install deps
+        working-directory: npm
+        run: npm ci
+
+      - name: Probe
+        working-directory: npm
+        run: npm run test:e2e
