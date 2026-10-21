@@ -239,6 +239,28 @@ describe("tiny cache (IndexedDB)", () => {
     expect(fetch2).toHaveBeenCalledTimes(1);
   });
 
+  it("keys a relative URL by the resource it resolves to, not by its spelling", async () => {
+    // Pages in different directories that both load "psl.bin" fetch different
+    // files; sharing one entry would hand the second page the first one's rules.
+    vi.stubGlobal("location", { href: "https://site.test/a/page.html" });
+    const first = await freshTiny();
+    await first.load({ url: "psl.bin", fetch: mockFetch() });
+
+    vi.stubGlobal("location", { href: "https://site.test/b/page.html" });
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
+    await second.load({ url: "psl.bin", fetch: fetch2 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+    expect(await idbPeek(idb, "https://site.test/a/psl.bin")).toBeDefined();
+    expect(await idbPeek(idb, "https://site.test/b/psl.bin")).toBeDefined();
+
+    // The same page again is a hit on its own entry.
+    const third = await freshTiny();
+    const fetch3 = mockFetch();
+    await third.load({ url: "psl.bin", fetch: fetch3 });
+    expect(fetch3).toHaveBeenCalledTimes(0);
+  });
+
   it("re-fetches when the entry is older than the TTL", async () => {
     const first = await freshTiny();
     await first.load({ url: SRC, fetch: mockFetch() });
@@ -319,6 +341,45 @@ describe("tiny cache (IndexedDB)", () => {
       });
     }
   }, 10_000);
+
+  it("treats a database a newer release upgraded as a miss, not a failure", async () => {
+    // A later package version may raise the schema version; opening it at our
+    // version then fails with VersionError, which must only cost a fetch.
+    await new Promise<void>((resolve, reject) => {
+      const open = idb.open("structured-public-domains", 2);
+      open.onupgradeneeded = () => open.result.createObjectStore("psl");
+      open.onsuccess = () => {
+        open.result.close();
+        resolve();
+      };
+      open.onerror = () => reject(open.error);
+    });
+    const tiny = await freshTiny();
+    const fetch = mockFetch();
+    await expect(tiny.load({ url: SRC, fetch })).resolves.toBeUndefined();
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats an entry whose bytes or timestamp have the wrong type as a miss", async () => {
+    for (const entry of [
+      { bytes: Array.from(PSL_BIN), cachedAt: Date.now() },
+      { bytes: new Uint8Array(PSL_BIN), cachedAt: String(Date.now()) },
+    ]) {
+      await idbSeed(idb, SRC, entry);
+      const tiny = await freshTiny();
+      const fetch = mockFetch();
+      await tiny.load({ url: SRC, fetch });
+      expect(fetch).toHaveBeenCalledTimes(1);
+    }
+  });
+
+  it("uses a URL that does not resolve against the page as given", async () => {
+    vi.stubGlobal("location", { href: "https://site.test/a/page.html" });
+    const unresolvable = "http://[bad";
+    const tiny = await freshTiny();
+    await tiny.load({ url: unresolvable, fetch: mockFetch() });
+    expect(await idbPeek(idb, unresolvable)).toBeDefined();
+  });
 
   it("still loads from the network when IndexedDB cannot be opened", async () => {
     // Shape of a context where the API exists but refuses access (e.g. storage

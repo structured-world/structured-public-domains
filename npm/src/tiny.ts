@@ -215,10 +215,26 @@ function idbFactory(): IDBFactory | undefined {
   return typeof indexedDB !== "undefined" ? indexedDB : undefined;
 }
 
+/**
+ * The IndexedDB key for `url`: the resource it names, not how it is spelled.
+ * fetch() resolves a relative URL against the document or worker, so two pages
+ * loading "psl.bin" from different directories fetch different files; keyed by
+ * the raw string they would share one entry and one page would get the other's
+ * rules. Outside a page there is no base and the URL is used as given.
+ */
+function idbKey(url: string): string {
+  if (typeof location === "undefined") return url;
+  try {
+    return new URL(url, location.href).href;
+  } catch {
+    return url;
+  }
+}
+
 async function readCache(url: string, ttlMs: number, cacheDir?: string): Promise<Uint8Array | undefined> {
   try {
     const idb = idbFactory();
-    if (idb !== undefined) return await readIdbCache(idb, url, ttlMs);
+    if (idb !== undefined) return await readIdbCache(idb, idbKey(url), ttlMs);
     return isNode ? await readNodeCache(url, ttlMs, cacheDir) : undefined;
   } catch {
     return undefined;
@@ -227,7 +243,7 @@ async function readCache(url: string, ttlMs: number, cacheDir?: string): Promise
 
 async function writeCache(url: string, data: Uint8Array, cacheDir?: string): Promise<void> {
   const idb = idbFactory();
-  if (idb !== undefined) await writeIdbCache(idb, url, data);
+  if (idb !== undefined) await writeIdbCache(idb, idbKey(url), data);
   else if (isNode) await writeNodeCache(url, data, cacheDir);
 }
 
@@ -235,7 +251,8 @@ async function writeCache(url: string, data: Uint8Array, cacheDir?: string): Pro
 async function deleteCache(url: string, cacheDir?: string): Promise<void> {
   const idb = idbFactory();
   if (idb !== undefined) {
-    await idbRun(idb, "readwrite", (store) => store.delete(url));
+    const key = idbKey(url);
+    await idbRun(idb, "readwrite", (store) => store.delete(key));
   } else if (isNode) {
     const { fs, file } = await nodeCache(url, cacheDir);
     fs.rmSync(file, { force: true });
