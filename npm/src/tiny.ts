@@ -259,7 +259,10 @@ async function nodeCache(url: string, cacheDir?: string) {
 async function readNodeCache(url: string, ttlMs: number, cacheDir?: string): Promise<Uint8Array | undefined> {
   const { fs, file } = await nodeCache(url, cacheDir);
   const stat = fs.statSync(file);
-  if (Date.now() - stat.mtimeMs >= ttlMs) return undefined;
+  // An mtime can sit ahead of Date.now(): it keeps the sub-millisecond part the
+  // clock drops, and a filesystem clock can run ahead. Age never goes below 0,
+  // so a zero TTL means expired rather than "written in the future".
+  if (Math.max(0, Date.now() - stat.mtimeMs) >= ttlMs) return undefined;
   return new Uint8Array(fs.readFileSync(file));
 }
 

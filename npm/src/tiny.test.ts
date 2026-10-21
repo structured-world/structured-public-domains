@@ -1,7 +1,7 @@
 // Tests for the runtime-fetched "tiny" entry. The PSL bytes are injected via a
 // mock fetch reading the real src/psl.bin, so results must match the embedded
 // build exactly. Module state is reset between tests via vitest module isolation.
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -130,6 +130,20 @@ describe("tiny cache (Node file)", () => {
     const second = await freshTiny();
     const fetch2 = mockFetch();
     // ttl 0 → any cached entry is already stale.
+    await second.load({ fetch: fetch2, cacheDir: dir, cacheTtlMs: 0 });
+    expect(fetch2).toHaveBeenCalledTimes(1);
+  });
+
+  it("treats a zero TTL as expired even when the file's mtime is ahead of the clock", async () => {
+    const first = await freshTiny();
+    await first.load({ fetch: mockFetch(), cacheDir: dir });
+    // mtime carries sub-millisecond precision that Date.now() drops, and a
+    // filesystem clock can run ahead; either puts a fresh file "in the future".
+    const ahead = new Date(Date.now() + 1000);
+    for (const f of readdirSync(dir)) utimesSync(join(dir, f), ahead, ahead);
+
+    const second = await freshTiny();
+    const fetch2 = mockFetch();
     await second.load({ fetch: fetch2, cacheDir: dir, cacheTtlMs: 0 });
     expect(fetch2).toHaveBeenCalledTimes(1);
   });
@@ -500,6 +514,16 @@ describe("tiny error handling", () => {
     const tiny = await freshTiny();
     const badFetch = vi.fn(async () => ({ ok: false, status: 503, statusText: "Service Unavailable" })) as unknown as typeof fetch;
     await expect(tiny.load({ fetch: badFetch, cache: false })).rejects.toThrow(/503/);
+  });
+
+  it("says how to fix it when the runtime has no fetch", async () => {
+    vi.stubGlobal("fetch", undefined);
+    try {
+      const tiny = await freshTiny();
+      await expect(tiny.load({ cache: false })).rejects.toThrow(/pass `fetch` in LoadOptions/);
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("throws on an implausibly small body", async () => {
