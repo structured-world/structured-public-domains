@@ -4,10 +4,11 @@
 // `await load()`, the lookup API is identical (and synchronous) to the main
 // entry — it reuses the same parser, so results are byte-identical.
 //
-// Cache: Node persists the blob to a temp dir with a TTL (survives restarts);
-// browsers use CacheStorage when available; otherwise the in-process singleton
-// is the only cache. All of it is best-effort — a cache failure never breaks a
-// lookup, it just falls back to a network fetch.
+// Cache: wherever IndexedDB exists (browser windows and workers, in secure and
+// plain-http contexts alike) the blob is stored there with a TTL; Node persists
+// it to a temp dir instead; otherwise the in-process singleton is the only
+// cache. All of it is best-effort — a cache failure never breaks a lookup, it
+// just falls back to a network fetch.
 
 import {
   lookupTrie,
@@ -35,11 +36,11 @@ export interface LoadOptions {
   url?: string;
   /** Custom fetch implementation (e.g. for proxies/tests). Defaults to the global `fetch`. */
   fetch?: typeof fetch;
-  /** Enable the persistent local cache (Node file / browser CacheStorage). Default `true`. */
+  /** Enable the persistent local cache (IndexedDB where available, else a Node file). Default `true`. */
   cache?: boolean;
   /** Cache freshness window in milliseconds. Default 24h. */
   cacheTtlMs?: number;
-  /** Node only: directory for the cache file. Defaults to an OS temp subdir. */
+  /** Node file cache only: directory for the cache file. Defaults to an OS temp subdir. */
   cacheDir?: string;
   /** Re-fetch even if already loaded / cached. Default `false`. */
   force?: boolean;
@@ -208,27 +209,36 @@ function cacheKey(url: string): string {
   return (h >>> 0).toString(16).padStart(8, "0");
 }
 
+// IndexedDB is looked up per call rather than captured at import, so a runtime
+// that installs it late (or a test that stubs it) is honoured.
+function idbFactory(): IDBFactory | undefined {
+  return typeof indexedDB !== "undefined" ? indexedDB : undefined;
+}
+
 async function readCache(url: string, ttlMs: number, cacheDir?: string): Promise<Uint8Array | undefined> {
   try {
-    return isNode ? await readNodeCache(url, ttlMs, cacheDir) : await readBrowserCache(url, ttlMs);
+    const idb = idbFactory();
+    if (idb !== undefined) return await readIdbCache(idb, url, ttlMs);
+    return isNode ? await readNodeCache(url, ttlMs, cacheDir) : undefined;
   } catch {
     return undefined;
   }
 }
 
 async function writeCache(url: string, data: Uint8Array, cacheDir?: string): Promise<void> {
-  if (isNode) await writeNodeCache(url, data, cacheDir);
-  else await writeBrowserCache(url, data);
+  const idb = idbFactory();
+  if (idb !== undefined) await writeIdbCache(idb, url, data);
+  else if (isNode) await writeNodeCache(url, data, cacheDir);
 }
 
 /** Remove a stale/corrupt cache entry so the next load() re-fetches cleanly. */
 async function deleteCache(url: string, cacheDir?: string): Promise<void> {
-  if (isNode) {
+  const idb = idbFactory();
+  if (idb !== undefined) {
+    await idbRun(idb, "readwrite", (store) => store.delete(url));
+  } else if (isNode) {
     const { fs, file } = await nodeCache(url, cacheDir);
     fs.rmSync(file, { force: true });
-  } else if (typeof caches !== "undefined") {
-    const cache = await caches.open("structured-public-domains");
-    await cache.delete(url);
   }
 }
 
@@ -263,20 +273,60 @@ async function writeNodeCache(url: string, data: Uint8Array, cacheDir?: string):
   fs.renameSync(tmp, file);
 }
 
-async function readBrowserCache(url: string, ttlMs: number): Promise<Uint8Array | undefined> {
-  if (typeof caches === "undefined") return undefined;
-  const cache = await caches.open("structured-public-domains");
-  const res = await cache.match(url);
-  if (res == null) return undefined;
-  const cachedAt = Number(res.headers.get("x-cached-at") ?? "0");
-  if (!Number.isFinite(cachedAt) || Date.now() - cachedAt >= ttlMs) return undefined;
-  return new Uint8Array(await res.arrayBuffer());
+const IDB_NAME = "structured-public-domains";
+const IDB_STORE = "psl";
+
+/** One cached blob, keyed by its source URL in {@link IDB_STORE}. */
+interface IdbEntry {
+  bytes: Uint8Array;
+  cachedAt: number;
 }
 
-async function writeBrowserCache(url: string, data: Uint8Array): Promise<void> {
-  if (typeof caches === "undefined") return;
-  const cache = await caches.open("structured-public-domains");
-  // Copy into a fresh ArrayBuffer so the Response owns its bytes.
-  const body = data.slice();
-  await cache.put(url, new Response(body, { headers: { "x-cached-at": String(Date.now()) } }));
+function idbOpen(idb: IDBFactory): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const req = idb.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error ?? new Error("IndexedDB open failed"));
+  });
+}
+
+/**
+ * Run one request in its own transaction and resolve with its result once the
+ * transaction commits, so a write is durable before load() reports success.
+ * The connection is closed afterwards to never hold up another tab's upgrade.
+ */
+async function idbRun<T>(
+  idb: IDBFactory,
+  mode: IDBTransactionMode,
+  op: (store: IDBObjectStore) => IDBRequest<T>,
+): Promise<T> {
+  const db = await idbOpen(idb);
+  try {
+    return await new Promise<T>((resolve, reject) => {
+      const tx = db.transaction(IDB_STORE, mode);
+      const req = op(tx.objectStore(IDB_STORE));
+      tx.oncomplete = () => resolve(req.result);
+      tx.onerror = () => reject(tx.error ?? req.error ?? new Error("IndexedDB request failed"));
+      tx.onabort = () => reject(tx.error ?? new Error("IndexedDB transaction aborted"));
+    });
+  } finally {
+    db.close();
+  }
+}
+
+async function readIdbCache(idb: IDBFactory, url: string, ttlMs: number): Promise<Uint8Array | undefined> {
+  const entry: unknown = await idbRun(idb, "readonly", (store) => store.get(url));
+  // Storage is origin-scoped and outlives this code, so a value of any other
+  // shape is a miss that the refetch overwrites, not something to trust.
+  if (typeof entry !== "object" || entry === null) return undefined;
+  const { bytes, cachedAt } = entry as Partial<IdbEntry>;
+  if (!(bytes instanceof Uint8Array) || typeof cachedAt !== "number") return undefined;
+  if (!Number.isFinite(cachedAt) || Date.now() - cachedAt >= ttlMs) return undefined;
+  return bytes;
+}
+
+async function writeIdbCache(idb: IDBFactory, url: string, data: Uint8Array): Promise<void> {
+  const entry: IdbEntry = { bytes: data, cachedAt: Date.now() };
+  await idbRun(idb, "readwrite", (store) => store.put(entry, url));
 }

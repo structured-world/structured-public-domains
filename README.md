@@ -92,9 +92,9 @@ entire PSL on every CI run, so both languages return identical results.
 
 For consumers who want always-fresh PSL **without bumping the package version**,
 the `/tiny` entry ships *without* the embedded blob. It fetches the prebuilt
-binary trie at runtime and caches it locally (Node: temp file with a TTL;
-browser: CacheStorage). After the first `await load()`, the lookup API is
-identical and synchronous.
+binary trie at runtime and caches it locally with a TTL (browser windows and
+workers: IndexedDB, including pages served over plain http; Node: a temp file).
+After the first `await load()`, the lookup API is identical and synchronous.
 
 ```typescript
 import { load, registrableDomain } from '@structured-world/structured-public-domains/tiny';
