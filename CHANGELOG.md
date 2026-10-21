@@ -7,6 +7,294 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.42](https://github.com/structured-world/structured-public-domains/compare/v0.0.41...v0.0.42) - 2026-10-21
+
+### Data
+
+PSL data update: +0 -2 domains.
+
+<details><summary>Removed (2)</summary>
+
+```
+aliases121.com
+oya.to
+```
+
+</details>
+
+
+## [0.0.41](https://github.com/structured-world/structured-public-domains/compare/v0.0.40...v0.0.41) - 2026-10-18
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+gitapp.si
+```
+
+</details>
+
+
+## [0.0.40](https://github.com/structured-world/structured-public-domains/compare/v0.0.39...v0.0.40) - 2026-10-17
+
+### Data
+
+PSL data update: +65 -2 domains.
+
+<details><summary>Added (65)</summary>
+
+```
+*.airflow.ap-southeast-7.on.aws
+consent-portal.bedrock-agentcore.ap-northeast-1.amazonaws.com
+consent-portal.bedrock-agentcore.ap-northeast-2.amazonaws.com
+consent-portal.bedrock-agentcore.ap-south-1.amazonaws.com
+consent-portal.bedrock-agentcore.ap-south-2.amazonaws.com
+consent-portal.bedrock-agentcore.ap-southeast-1.amazonaws.com
+consent-portal.bedrock-agentcore.ap-southeast-2.amazonaws.com
+consent-portal.bedrock-agentcore.ap-southeast-5.amazonaws.com
+consent-portal.bedrock-agentcore.ap-southeast-7.amazonaws.com
+consent-portal.bedrock-agentcore.ca-central-1.amazonaws.com
+consent-portal.bedrock-agentcore.eu-central-1.amazonaws.com
+consent-portal.bedrock-agentcore.eu-north-1.amazonaws.com
+consent-portal.bedrock-agentcore.eu-south-1.amazonaws.com
+consent-portal.bedrock-agentcore.eu-south-2.amazonaws.com
+consent-portal.bedrock-agentcore.eu-west-1.amazonaws.com
+consent-portal.bedrock-agentcore.eu-west-2.amazonaws.com
+consent-portal.bedrock-agentcore.eu-west-3.amazonaws.com
+consent-portal.bedrock-agentcore.sa-east-1.amazonaws.com
+consent-portal.bedrock-agentcore.us-east-1.amazonaws.com
+consent-portal.bedrock-agentcore.us-east-2.amazonaws.com
+consent-portal.bedrock-agentcore.us-gov-west-1.amazonaws.com
+consent-portal.bedrock-agentcore.us-west-1.amazonaws.com
+consent-portal.bedrock-agentcore.us-west-2.amazonaws.com
+de.object.ncloudstorage.com
+jp.jp4.object.ncpstorage.com
+jp.jp4.object.private.ncpstorage.com
+jp.jp5.object.ncpstorage.com
+jp.jp5.object.private.ncpstorage.com
+jp.object.ncpstorage.com
+jp.object.private.ncpstorage.com
+kr-naver-dev.ncloudstorage.com
+kr-naver-dev.website.ncloudstorage.com
+kr-naver.ncloudstorage.com
+kr-naver.website.ncloudstorage.com
+kr-private.gov-ncloudstorage.com
+kr-private.ncloudstorage.com
+kr.gov-ncloudstorage.com
+kr.ncloudstorage.com
+kr.object.fin-ncloudstorage.com
+kr.object.gov-ncloudstorage.com
+kr.object.ncloudstorage.com
+kr.object.ncpstorage.com
+kr.object.private.fin-ncloudstorage.com
+kr.object.private.gov-ncloudstorage.com
+kr.object.private.ncloudstorage.com
+kr.object.private.ncpstorage.com
+kr.objectstorage.ncloud.com
+kr.website.ncloudstorage.com
+krs.object.gov-ncloudstorage.com
+krs.object.private.gov-ncloudstorage.com
+s3-website-jp.object.ncpstorage.com
+s3-website.de.object.ncloudstorage.com
+s3-website.kr.object.fin-ncloudstorage.com
+s3-website.kr.object.gov-ncloudstorage.com
+s3-website.kr.object.ncloudstorage.com
+s3-website.krs.object.gov-ncloudstorage.com
+s3-website.sg.object.ncloudstorage.com
+s3-website.us.object.ncloudstorage.com
+sg.object.ncloudstorage.com
+sg.object.private.ncloudstorage.com
+sg.objectstorage.ncloud.com
+transfer-webapp.ap-east-2.on.aws
+transfer-webapp.ap-southeast-6.on.aws
+transfer-webapp.eusc-de-east-1.on.amazonwebservices.eu
+us.object.ncloudstorage.com
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+knightpoint.systems
+perspecta.cloud
+```
+
+</details>
+
+
+## [0.0.39](https://github.com/structured-world/structured-public-domains/compare/v0.0.38...v0.0.39) - 2026-10-07
+
+### Data
+
+PSL data update: +30 -27 domains.
+
+<details><summary>Added (30)</summary>
+
+```
+*.ap-east-1.cs.amazonlightsail.com
+*.ap-northeast-1.cs.amazonlightsail.com
+*.ap-northeast-2.cs.amazonlightsail.com
+*.ap-south-1.cs.amazonlightsail.com
+*.ap-southeast-1.cs.amazonlightsail.com
+*.ap-southeast-2.cs.amazonlightsail.com
+*.ap-southeast-3.cs.amazonlightsail.com
+*.ap-southeast-5.cs.amazonlightsail.com
+*.ca-central-1.cs.amazonlightsail.com
+*.eu-central-1.cs.amazonlightsail.com
+*.eu-north-1.cs.amazonlightsail.com
+*.eu-south-2.cs.amazonlightsail.com
+*.eu-west-1.cs.amazonlightsail.com
+*.eu-west-2.cs.amazonlightsail.com
+*.eu-west-3.cs.amazonlightsail.com
+*.replit.dev
+*.sa-east-1.cs.amazonlightsail.com
+*.teams.replit.dev
+*.us-east-1.cs.amazonlightsail.com
+*.us-east-2.cs.amazonlightsail.com
+*.us-west-2.cs.amazonlightsail.com
+amazonlightsail.com
+ap-south-2.elasticbeanstalk.com
+ap-southeast-4.elasticbeanstalk.com
+ap-southeast-6.elasticbeanstalk.com
+auth.ap-east-2.amazoncognito.com
+auth.ap-southeast-6.amazoncognito.com
+ca-west-1.elasticbeanstalk.com
+eu-central-2.elasticbeanstalk.com
+retool.app
+```
+
+</details>
+
+<details><summary>Removed (27)</summary>
+
+```
+archer.replit.dev
+bones.replit.dev
+canary.replit.dev
+global.replit.dev
+hacker.replit.dev
+id.replit.dev
+janeway.replit.dev
+kim.replit.dev
+kira.replit.dev
+kirk.replit.dev
+odo.replit.dev
+paris.replit.dev
+picard.replit.dev
+pike.replit.dev
+prerelease.replit.dev
+reed.replit.dev
+replit.dev
+riker.replit.dev
+sisko.replit.dev
+spock.replit.dev
+staging.replit.dev
+sulu.replit.dev
+tarpit.replit.dev
+teams.replit.dev
+tucker.replit.dev
+wesley.replit.dev
+worf.replit.dev
+```
+
+</details>
+
+
+## [0.0.38](https://github.com/structured-world/structured-public-domains/compare/v0.0.37...v0.0.38) - 2026-10-02
+
+### Data
+
+PSL data update: +0 -1 domains.
+
+<details><summary>Removed (1)</summary>
+
+```
+juniper
+```
+
+</details>
+
+
+## [0.0.37](https://github.com/structured-world/structured-public-domains/compare/v0.0.36...v0.0.37) - 2026-09-25
+
+### Data
+
+PSL data update: +1 -0 domains.
+
+<details><summary>Added (1)</summary>
+
+```
+glideos.app
+```
+
+</details>
+
+
+## [0.0.36](https://github.com/structured-world/structured-public-domains/compare/v0.0.35...v0.0.36) - 2026-09-24
+
+### Data
+
+PSL data update: +3 -0 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+iqhs.pl
+site.hosting-cluster.nl
+site.webhosting.be
+```
+
+</details>
+
+
+## [0.0.35](https://github.com/structured-world/structured-public-domains/compare/v0.0.34...v0.0.35) - 2026-09-22
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+*.azure.databricksapps.com
+aws-gov.databricksapps.us
+aws.databricksapps.com
+gcp.databricksapps.com
+surge.sh
+```
+
+</details>
+
+
+## [0.0.34](https://github.com/structured-world/structured-public-domains/compare/v0.0.33...v0.0.34) - 2026-09-19
+
+### Data
+
+PSL data update: +2 -2 domains.
+
+<details><summary>Added (2)</summary>
+
+```
+*.compute.herokuapp.com
+hosted-by-files.com
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+alpha-myqnapcloud.com
+dev-myqnapcloud.com
+```
+
+</details>
+
+
 ## [0.0.33](https://github.com/structured-world/structured-public-domains/compare/v0.0.32...v0.0.33) - 2026-09-09
 
 ### Data
