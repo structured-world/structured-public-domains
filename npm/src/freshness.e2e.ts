@@ -54,6 +54,15 @@ async function sourceAt(cutoff: Date): Promise<{ sha: string; rules: Set<string>
   return { sha, rules: sourceRules(text) };
 }
 
+/** A report line computed best-effort: its failure becomes the line itself. */
+async function diagnose(line: () => Promise<string>): Promise<string> {
+  try {
+    return await line();
+  } catch (err) {
+    return `unavailable (${err instanceof Error ? err.message : String(err)})`;
+  }
+}
+
 describe("PSL freshness (network)", () => {
   it("serves a trie with no source change older than the update window missing", async () => {
     const sourceText = await (await fetchOk(SOURCE_URL)).text();
@@ -69,20 +78,26 @@ describe("PSL freshness (network)", () => {
     const served = lag(live, trieRules(pslData()));
     const late = overdue(served, atCutoff.rules);
 
-    // Where a lag sits, for the report only.
-    const latest = (await (await fetchOk(`https://registry.npmjs.org/${PKG}/latest`)).json()) as { version: string };
-    const exactUrl = `https://cdn.jsdelivr.net/npm/${PKG}@${latest.version}/dist/psl.bin`;
-    const exact = lag(live, trieRules(new Uint8Array(await (await fetchOk(exactUrl)).arrayBuffer())));
-    const repoBin = readFileSync(join(fileURLToPath(import.meta.url), "..", "..", "..", "src", "psl.bin"));
-    const repo = lag(live, trieRules(new Uint8Array(repoBin)));
+    // Where a lag sits, for the report only. These lines must never decide the
+    // verdict or hide it, so a failure here is reported in place, not thrown.
+    const npmLine = await diagnose(async () => {
+      const latest = (await (await fetchOk(`https://registry.npmjs.org/${PKG}/latest`)).json()) as { version: string };
+      const exactUrl = `https://cdn.jsdelivr.net/npm/${PKG}@${latest.version}/dist/psl.bin`;
+      const image = new Uint8Array(await (await fetchOk(exactUrl)).arrayBuffer());
+      return `${PKG}@${latest.version}: ${describeLag(lag(live, trieRules(image)))}`;
+    });
+    const repoLine = await diagnose(async () => {
+      const repoBin = readFileSync(join(fileURLToPath(import.meta.url), "..", "..", "..", "src", "psl.bin"));
+      return `src/psl.bin: ${describeLag(lag(live, trieRules(new Uint8Array(repoBin))))}`;
+    });
 
     const report = [
       `source   ${SOURCE_URL}: ${live.size} rules, VERSION ${version}`,
       `cutoff   ${cutoff.toISOString()} (${STALE_AFTER_HOURS}h): ${HISTORY_REPO}@${atCutoff.sha.slice(0, 12)}`,
       `served   ${servedUrl}: ${describeLag(served)}`,
       `overdue  ${describeLag(late)}`,
-      `npm      ${PKG}@${latest.version}: ${describeLag(exact)}`,
-      `checkout src/psl.bin: ${describeLag(repo)}`,
+      `npm      ${npmLine}`,
+      `checkout ${repoLine}`,
     ].join("\n");
     console.log(report);
 
