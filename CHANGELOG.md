@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.42](https://github.com/structured-world/structured-public-domains/compare/v0.0.41...v0.0.42) - 2026-10-21
+
+### Data
+
+PSL data update: +0 -2 domains.
+
+<details><summary>Removed (2)</summary>
+
+```
+aliases121.com
+oya.to
+```
+
+</details>
+
+
 ## [0.0.41](https://github.com/structured-world/structured-public-domains/compare/v0.0.40...v0.0.41) - 2026-10-18
 
 ### Data
