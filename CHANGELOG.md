@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.44](https://github.com/structured-world/structured-public-domains/compare/v0.0.43...v0.0.44) - 2026-10-21
+
+### Added
+
+- *(npm)* cache the tiny entry's trie in IndexedDB ([#107](https://github.com/structured-world/structured-public-domains/pull/107))
+
 ## [0.0.42](https://github.com/structured-world/structured-public-domains/compare/v0.0.41...v0.0.42) - 2026-10-21
 
 ### Data
