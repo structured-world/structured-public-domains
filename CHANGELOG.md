@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.45](https://github.com/structured-world/structured-public-domains/compare/v0.0.44...v0.0.45) - 2026-10-23
+
+### Data
+
+PSL data update: +1 -0 domains.
+
+<details><summary>Added (1)</summary>
+
+```
+*.ztna-dingtalk.com
+```
+
+</details>
+
+
 ## [0.0.44](https://github.com/structured-world/structured-public-domains/compare/v0.0.43...v0.0.44) - 2026-10-21
 
 ### Added
