@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.47](https://github.com/structured-world/structured-public-domains/compare/v0.0.46...v0.0.47) - 2026-11-05
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+linkyhost.page
+manus.space
+pagelemon.dev
+sanity.run
+sanity.studio
+```
+
+</details>
+
+
 ## [0.0.46](https://github.com/structured-world/structured-public-domains/compare/v0.0.45...v0.0.46) - 2026-11-01
 
 ### Data
