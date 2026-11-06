@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.49](https://github.com/structured-world/structured-public-domains/compare/v0.0.48...v0.0.49) - 2026-11-06
+
+### Testing
+
+- *(npm)* probe that the served trie keeps up with the live PSL ([#108](https://github.com/structured-world/structured-public-domains/pull/108))
+
 ## [0.0.48](https://github.com/structured-world/structured-public-domains/compare/v0.0.47...v0.0.48) - 2026-11-06
 
 ### Data
