@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.49](https://github.com/structured-world/structured-public-domains/compare/v0.0.48...v0.0.49) - 2026-11-09
+
+### Data
+
+PSL data update: +3 -0 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+ad.vn
+ap.vn
+on.vn
+```
+
+</details>
+
+
 ## [0.0.48](https://github.com/structured-world/structured-public-domains/compare/v0.0.47...v0.0.48) - 2026-11-06
 
 ### Data
