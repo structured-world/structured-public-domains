@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.50](https://github.com/structured-world/structured-public-domains/compare/v0.0.49...v0.0.50) - 2026-11-10
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+abyme.dev
+cloudzyro.app
+gov.de
+prod.page
+ship.place
+```
+
+</details>
+
+
 ## [0.0.49](https://github.com/structured-world/structured-public-domains/compare/v0.0.48...v0.0.49) - 2026-11-09
 
 ### Data
