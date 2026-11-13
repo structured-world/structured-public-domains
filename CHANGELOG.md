@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.52](https://github.com/structured-world/structured-public-domains/compare/v0.0.51...v0.0.52) - 2026-11-13
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+cloud.modelence.app
+medusajs.site
+modelence.app
+rwx.run
+sandbox.modelence.app
+```
+
+</details>
+
+
 ## [0.0.51](https://github.com/structured-world/structured-public-domains/compare/v0.0.50...v0.0.51) - 2026-11-11
 
 ### Data
