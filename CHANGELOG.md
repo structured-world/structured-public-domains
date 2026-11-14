@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.53](https://github.com/structured-world/structured-public-domains/compare/v0.0.52...v0.0.53) - 2026-11-14
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+app.amba.host
+cdn.amba.host
+crbts.app
+fn.amba.host
+go.amba.host
+```
+
+</details>
+
+
 ## [0.0.52](https://github.com/structured-world/structured-public-domains/compare/v0.0.51...v0.0.52) - 2026-11-13
 
 ### Data
