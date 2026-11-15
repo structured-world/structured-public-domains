@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.54](https://github.com/structured-world/structured-public-domains/compare/v0.0.53...v0.0.54) - 2026-11-15
+
+### Data
+
+PSL data update: +26 -2 domains.
+
+<details><summary>Added (26)</summary>
+
+```
+agilevibes.app
+bearly.sh
+co.fo
+com.fo
+ddns.ge
+dns.army
+dns.navy
+mymagic.page
+myoxypages.com
+ninjaneer-sites.com
+omgs.page
+reliantlabs.dev
+reliantpreview.dev
+sail.box
+sites.reliantlabs.dev
+sm.run
+space.fast
+terramind.io
+v6.army
+v6.navy
+v6.rocks
+view.fast
+voati.host
+wz.io
+wz.org
+xwx.me
+```
+
+</details>
+
+<details><summary>Removed (2)</summary>
+
+```
+imagine-proxy.work
+imagine.diy
+```
+
+</details>
+
+
 ## [0.0.53](https://github.com/structured-world/structured-public-domains/compare/v0.0.52...v0.0.53) - 2026-11-14
 
 ### Data
