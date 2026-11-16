@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.55](https://github.com/structured-world/structured-public-domains/compare/v0.0.54...v0.0.55) - 2026-11-16
+
+### Data
+
+PSL data update: +4 -0 domains.
+
+<details><summary>Added (4)</summary>
+
+```
+apps.devs.ai
+ceero.site
+ginta.page
+loc.cc
+```
+
+</details>
+
+
 ## [0.0.54](https://github.com/structured-world/structured-public-domains/compare/v0.0.53...v0.0.54) - 2026-11-15
 
 ### Data
