@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.56](https://github.com/structured-world/structured-public-domains/compare/v0.0.55...v0.0.56) - 2026-11-17
+
+### Data
+
+PSL data update: +9 -0 domains.
+
+<details><summary>Added (9)</summary>
+
+```
+*.2na.am
+fastedge.app
+gcorecdn.com
+kliv.site
+mailerpage.io
+prod.enter.pro
+solidres.page
+subscribepage.io
+uncld.dev
+```
+
+</details>
+
+
 ## [0.0.55](https://github.com/structured-world/structured-public-domains/compare/v0.0.54...v0.0.55) - 2026-11-16
 
 ### Data
