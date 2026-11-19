@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.57](https://github.com/structured-world/structured-public-domains/compare/v0.0.56...v0.0.57) - 2026-11-18
+
+### Data
+
+PSL data update: +1 -0 domains.
+
+<details><summary>Added (1)</summary>
+
+```
+nippy.site
+```
+
+</details>
+
+
 ## [0.0.56](https://github.com/structured-world/structured-public-domains/compare/v0.0.55...v0.0.56) - 2026-11-17
 
 ### Data
