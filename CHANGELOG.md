@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.58](https://github.com/structured-world/structured-public-domains/compare/v0.0.57...v0.0.58) - 2026-11-20
+
+### Data
+
+PSL data update: +4 -0 domains.
+
+<details><summary>Added (4)</summary>
+
+```
+*.prairielearn-user-content.com
+kz.ci
+pvf.cc
+xyz.ci
+```
+
+</details>
+
+
 ## [0.0.57](https://github.com/structured-world/structured-public-domains/compare/v0.0.56...v0.0.57) - 2026-11-18
 
 ### Data
