@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.59](https://github.com/structured-world/structured-public-domains/compare/v0.0.58...v0.0.59) - 2026-11-21
+
+### Data
+
+PSL data update: +3 -1 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+fj.kg
+staging.wordsmithmcpcontent.com
+wordsmithmcpcontent.com
+```
+
+</details>
+
+<details><summary>Removed (1)</summary>
+
+```
+xihuan
+```
+
+</details>
+
+
 ## [0.0.58](https://github.com/structured-world/structured-public-domains/compare/v0.0.57...v0.0.58) - 2026-11-20
 
 ### Data
