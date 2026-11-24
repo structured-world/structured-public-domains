@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.60](https://github.com/structured-world/structured-public-domains/compare/v0.0.59...v0.0.60) - 2026-11-24
+
+### Data
+
+PSL data update: +3 -0 domains.
+
+<details><summary>Added (3)</summary>
+
+```
+*.airoapp.ai
+*.host.cloud
+sites.aspirethemes.com
+```
+
+</details>
+
+
 ## [0.0.59](https://github.com/structured-world/structured-public-domains/compare/v0.0.58...v0.0.59) - 2026-11-21
 
 ### Data
