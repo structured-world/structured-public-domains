@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.61](https://github.com/structured-world/structured-public-domains/compare/v0.0.60...v0.0.61) - 2026-11-25
+
+### Data
+
+PSL data update: +11 -6 domains.
+
+<details><summary>Added (11)</summary>
+
+```
+*.shared.atlassian-3p-us-gov-mod.com
+*.shared.atlassian-3p.com
+*.shared.atlassian-isolated-3p.com
+blacktops.app
+blacktops.page
+faable.link
+greybull.site
+ipdisk.co.kr
+iptime.org
+onhomemade.com
+shipstatic.com
+```
+
+</details>
+
+<details><summary>Removed (6)</summary>
+
+```
+adimo.co.uk
+diadem.cloud
+leapcell.dev
+leapcell.online
+mircloud.host
+mircloud.us
+```
+
+</details>
+
+
 ## [0.0.60](https://github.com/structured-world/structured-public-domains/compare/v0.0.59...v0.0.60) - 2026-11-24
 
 ### Data
