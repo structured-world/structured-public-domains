@@ -7,6 +7,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.62](https://github.com/structured-world/structured-public-domains/compare/v0.0.61...v0.0.62) - 2026-11-26
+
+### Data
+
+PSL data update: +18 -1 domains.
+
+<details><summary>Added (18)</summary>
+
+```
+agric.bw
+atoms.world
+bg5.net
+bonto.page
+entrypages.net
+fs.kg
+fusebase.site
+hostney.app
+hostney.cloud
+infusion-ai.cloud
+is-a.si
+me.bw
+mythex.app
+pub.atoms.world
+pymaia.app
+shop.bw
+strw.app
+wirechunk.site
+```
+
+</details>
+
+<details><summary>Removed (1)</summary>
+
+```
+leapcell.app
+```
+
+</details>
+
+
 ## [0.0.61](https://github.com/structured-world/structured-public-domains/compare/v0.0.60...v0.0.61) - 2026-11-25
 
 ### Data
