@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.63](https://github.com/structured-world/structured-public-domains/compare/v0.0.62...v0.0.63) - 2026-11-27
+
+### Data
+
+PSL data update: +8 -0 domains.
+
+<details><summary>Added (8)</summary>
+
+```
+phronusercontent.com
+relumesite.ai
+softr.app
+spheron.live
+staticrun.app
+xport.free
+xport.host
+xport.sh
+```
+
+</details>
+
+
 ## [0.0.62](https://github.com/structured-world/structured-public-domains/compare/v0.0.61...v0.0.62) - 2026-11-26
 
 ### Data
