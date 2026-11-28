@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.0.64](https://github.com/structured-world/structured-public-domains/compare/v0.0.63...v0.0.64) - 2026-11-28
+
+### Data
+
+PSL data update: +5 -0 domains.
+
+<details><summary>Added (5)</summary>
+
+```
+agental.site
+aiwebinfra.app
+eureka.zone
+lambforge.app
+tnas.online
+```
+
+</details>
+
+
 ## [0.0.63](https://github.com/structured-world/structured-public-domains/compare/v0.0.62...v0.0.63) - 2026-11-27
 
 ### Data
